@@ -1,24 +1,47 @@
 package com.kocaeli.graphcite.ui;
 
-import org.graphstream.graph.Graph;
-import org.graphstream.graph.implementations.SingleGraph;
+import com.kocaeli.graphcite.graph.GraphAlgorithms;
+import com.kocaeli.graphcite.model.Makale;
+import com.kocaeli.graphcite.parser.JsonParser;
+import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        // GraphStream'in Swing arayüzünü kullanması için ayar
-        System.setProperty("org.graphstream.ui", "swing");
+        try {
+            System.out.println("⏳ Veriler yükleniyor...");
+            List<Makale> makaleler = JsonParser.parse("data.json");
 
-        Graph graph = new SingleGraph("TestGraflari");
+            System.out.println("🧮 Algoritmalar hazırlanıyor...");
+            GraphAlgorithms algo = new GraphAlgorithms(makaleler);
 
-        // CSS ile stil verelim (Görselleştirme testi)
-        graph.setAttribute("ui.stylesheet", "node { fill-color: red; size: 30px; text-size: 20; }");
+            // TEST: Rastgele bir makale seçelim (veya atıfı bol olan birini)
+            // Örnek ID (Listedeki ilk makaleyi alalım)
+            String testId = makaleler.get(0).getId();
+            // Veya elle bildiğin bir ID yaz: String testId = "https://openalex.org/W2002615855";
 
-        // Bir düğüm ekleyelim
-        graph.addNode("A").setAttribute("ui.label", "Merhaba Prolab!");
-        graph.addNode("B").setAttribute("ui.label", "Onur & Dilay");
-        graph.addEdge("AB", "A", "B");
+            System.out.println("\n--- ANALİZ BAŞLIYOR: " + testId + " ---");
 
-        // Ekrana bastır
-        graph.display();
+            Makale hedef = algo.getMakale(testId);
+            if(hedef != null) {
+                System.out.println("Makale Başlığı: " + hedef.getTitle());
+                System.out.println("Toplam Atıf Sayısı (Citation Count): " + hedef.getCitationCount());
+
+                // H-INDEX HESAPLA
+                int hIndex = algo.calculateHIndex(testId);
+                System.out.println("🔥 H-INDEX: " + hIndex);
+
+                // H-CORE LİSTELE
+                List<Makale> hCore = algo.getHCore(testId);
+                System.out.println("💎 H-CORE Listesi (" + hCore.size() + " makale):");
+                for(Makale m : hCore) {
+                    System.out.println("   -> [" + m.getCitationCount() + " atıf] " + m.getId());
+                }
+            } else {
+                System.out.println("Makale bulunamadı!");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
