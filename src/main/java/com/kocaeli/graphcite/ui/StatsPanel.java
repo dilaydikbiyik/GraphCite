@@ -1,100 +1,75 @@
 package com.kocaeli.graphcite.ui;
 
 import com.kocaeli.graphcite.model.Makale;
-
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 public class StatsPanel extends JPanel {
 
     public StatsPanel(List<Makale> makaleler) {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setBackground(new Color(236, 240, 241)); // Hafif gri
+        setBackground(Color.WHITE);
+        setBorder(BorderFactory.createEmptyBorder(20, 25, 20, 25));
 
-        TitledBorder border = BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(new Color(189, 195, 199)), "Genel İstatistikler");
-        border.setTitleFont(new Font("Segoe UI", Font.BOLD, 12));
-        border.setTitleColor(Color.DARK_GRAY);
-        setBorder(border);
-
-        // Daha fazla satır gösterebilmek için büyüttük
-        setMaximumSize(new Dimension(300, 190));
-
+        // Veri Analizi
         int totalNodes = makaleler.size();
-
-        // incoming hesaplamak için: refId -> kaç kere referans verilmiş
+        int totalBlackEdges = 0;
+        int totalGiven = 0;
+        int totalTaken = 0;
         Map<String, Integer> incoming = new HashMap<>();
-
-        int totalGivenRefs = 0; // toplam verilen referans (outgoing)
-        int totalBlackEdges = 0; // "siyah kenar": dataset içindeki geçerli referans sayısı
-
-        // id seti: sadece dataset içinde olanları saymak istersek
-        Map<String, Boolean> exists = new HashMap<>();
-        for (Makale m : makaleler) exists.put(m.getId(), true);
-
-        Makale mostReferencing = null; // en çok referans veren (outgoing max)
-        String mostCitedId = null;     // en çok referans alan (incoming max)
-        int mostCitedCount = -1;
+        Makale workhorse = null; // En çok referans veren
 
         for (Makale m : makaleler) {
-            int given = (m.getReferencedWorkIds() == null) ? 0 : m.getReferencedWorkIds().size();
-            totalGivenRefs += given;
+            int refs = m.getReferencedWorkIds().size();
+            totalGiven += refs;
+            if (workhorse == null || refs > workhorse.getReferencedWorkIds().size()) workhorse = m;
 
-            if (mostReferencing == null || given > mostReferencing.getReferencedWorkIds().size()) {
-                mostReferencing = m;
-            }
-
-            // incoming say
-            if (m.getReferencedWorkIds() != null) {
-                for (String refId : m.getReferencedWorkIds()) {
-                    // sadece bizim grafımızda olan makalelere olan referansları "siyah kenar" sayalım
-                    if (refId != null && exists.containsKey(refId)) {
-                        totalBlackEdges++;
-                        incoming.put(refId, incoming.getOrDefault(refId, 0) + 1);
-                    }
-                }
+            for (String rid : m.getReferencedWorkIds()) {
+                incoming.put(rid, incoming.getOrDefault(rid, 0) + 1);
+                totalBlackEdges++; // Sadeleştirilmiş siyah kenar hesabı [cite: 16, 49]
             }
         }
 
-        int totalTakenRefs = 0; // toplam alınan referans = incoming toplamı
-        for (int v : incoming.values()) totalTakenRefs += v;
-
+        String topId = "-";
+        int topVal = 0;
         for (Map.Entry<String, Integer> e : incoming.entrySet()) {
-            if (e.getValue() > mostCitedCount) {
-                mostCitedCount = e.getValue();
-                mostCitedId = e.getKey();
-            }
+            if (e.getValue() > topVal) { topVal = e.getValue(); topId = e.getKey(); }
+            totalTaken += e.getValue();
         }
 
-        // UI
-        addLabel("• Toplam Makale: " + totalNodes);
-        addLabel("• Toplam Referans (Siyah Kenar): " + totalBlackEdges);
+        // UI Kartları
+        add(createStatRow("Genel Durum", "", true));
+        add(createStatRow("Toplam Makale", String.valueOf(totalNodes), false));
+        add(createStatRow("Siyah Kenar", String.valueOf(totalBlackEdges), false));
 
-        add(Box.createVerticalStrut(6));
+        add(Box.createVerticalStrut(15));
+        add(createStatRow("En Popüler (Atıf Alan)", "", true));
+        add(createStatRow("ID", topId, false));
+        add(createStatRow("Atıf Sayısı", String.valueOf(topVal), false));
 
-        addLabel("• Toplam Verilen Referans: " + totalGivenRefs);
-        addLabel("• Toplam Alınan Referans: " + totalTakenRefs);
-
-        add(Box.createVerticalStrut(10));
-
-        addLabel("• En Çok Referans Alan:");
-        addLabel("  ID: " + (mostCitedId != null ? mostCitedId : "Bulunamadı"));
-        addLabel("  Sayı: " + (mostCitedId != null ? mostCitedCount : 0));
-
-        add(Box.createVerticalStrut(10));
-
-        addLabel("• En Çok Referans Veren:");
-        addLabel("  ID: " + (mostReferencing != null ? mostReferencing.getId() : "Bulunamadı"));
-        addLabel("  Sayı: " + (mostReferencing != null ? mostReferencing.getReferencedWorkIds().size() : 0));
+        add(Box.createVerticalStrut(15));
+        add(createStatRow("En Çalışkan (Atıf Veren)", "", true));
+        add(createStatRow("ID", (workhorse != null ? workhorse.getId() : "-"), false));
+        add(createStatRow("Verilen Atıf", (workhorse != null ? String.valueOf(workhorse.getReferencedWorkIds().size()) : "0"), false));
     }
 
-    private void addLabel(String text) {
-        JLabel lbl = new JLabel(text);
-        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        add(lbl);
+    private JPanel createStatRow(String label, String value, boolean isHeader) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setOpaque(false);
+        p.setMaximumSize(new Dimension(300, 30));
+
+        JLabel lbl = new JLabel(label);
+        lbl.setFont(new Font("Segoe UI", isHeader ? Font.BOLD : Font.PLAIN, isHeader ? 14 : 12));
+        lbl.setForeground(isHeader ? new Color(51, 65, 85) : new Color(100, 116, 139));
+
+        JLabel val = new JLabel(value);
+        val.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        val.setForeground(new Color(37, 99, 235));
+
+        p.add(lbl, BorderLayout.WEST);
+        if (!isHeader) p.add(val, BorderLayout.EAST);
+        return p;
     }
 }

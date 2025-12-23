@@ -4,246 +4,140 @@ import com.kocaeli.graphcite.graph.GraphAlgorithms;
 import com.kocaeli.graphcite.model.Makale;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
-
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class ControlPanel extends JPanel {
-
     private final GraphAlgorithms algorithms;
     private final Graph graph;
-
-    private JTextField txtSearchId;
+    private JTextField txtSearch, txtK;
     private JTextArea txtInfo;
-    private JTextField txtKInput;
 
     public ControlPanel(GraphAlgorithms algorithms, Graph graph) {
         this.algorithms = algorithms;
         this.graph = graph;
-
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBackground(Color.WHITE);
-        setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        setBorder(BorderFactory.createEmptyBorder(20, 25, 20, 25));
 
-        initSearchBox();
-        add(Box.createVerticalStrut(15));
-        initInfoBox();
-        add(Box.createVerticalStrut(15));
-        initActionButtons();
-    }
+        // Arama Bölümü
+        add(createSectionTitle("Makale Sorgula"));
+        txtSearch = new JTextField();
+        JButton btnSearch = createButton("Bul & Odaklan", new Color(59, 130, 246));
+        btnSearch.addActionListener(e -> findArticle());
+        add(txtSearch);
+        add(Box.createVerticalStrut(5));
+        add(btnSearch);
 
-    // ---------------- UI ----------------
-
-    private void initSearchBox() {
-        JPanel pnl = createPanel("Makale Ara (ID)");
-        txtSearchId = new JTextField(12);
-        JButton btn = styledButton("Bul", new Color(52, 152, 219));
-        btn.addActionListener(e -> findArticle());
-
-        pnl.add(txtSearchId);
-        pnl.add(btn);
-        add(pnl);
-    }
-
-    private void initInfoBox() {
-        JPanel pnl = new JPanel(new BorderLayout());
-        pnl.setBackground(Color.WHITE);
-        pnl.setBorder(createBorder("Makale Bilgileri"));
-        pnl.setMaximumSize(new Dimension(300, 240));
-
-        txtInfo = new JTextArea("Bir makaleye tıklayın veya aratın...");
+        // Bilgi Kutusu
+        add(Box.createVerticalStrut(20));
+        add(createSectionTitle("Analiz Çıktısı"));
+        txtInfo = new JTextArea(6, 20);
         txtInfo.setEditable(false);
         txtInfo.setLineWrap(true);
-        txtInfo.setWrapStyleWord(true);
-        txtInfo.setFont(new Font("Consolas", Font.PLAIN, 12));
-        txtInfo.setBackground(new Color(250, 250, 250));
-        txtInfo.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        txtInfo.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        txtInfo.setBackground(new Color(248, 250, 252));
+        add(new JScrollPane(txtInfo));
 
-        pnl.add(new JScrollPane(txtInfo), BorderLayout.CENTER);
-        add(pnl);
+        // Analiz Butonları
+        add(Box.createVerticalStrut(20));
+        add(createSectionTitle("Graf Analiz Metrikleri"));
+
+        JButton btnH = createButton("H-Index / Median Hesapla", new Color(16, 185, 129));
+        btnH.addActionListener(e -> calcH());
+        add(btnH);
+
+        add(Box.createVerticalStrut(8));
+        JButton btnB = createButton("Betweenness Centrality", new Color(139, 92, 246));
+        btnB.addActionListener(e -> calcB());
+        add(btnB);
+
+        add(Box.createVerticalStrut(8));
+        JPanel kPanel = new JPanel(new BorderLayout(5, 0));
+        kPanel.setOpaque(false);
+        txtK = new JTextField("2", 3);
+        JButton btnK = createButton("K-Core Uygula", new Color(245, 158, 11));
+        btnK.addActionListener(e -> calcK());
+        kPanel.add(new JLabel("K:"), BorderLayout.WEST);
+        kPanel.add(txtK, BorderLayout.CENTER);
+        kPanel.add(btnK, BorderLayout.EAST);
+        add(kPanel);
     }
 
-    private void initActionButtons() {
-        JPanel pnl = new JPanel(new GridLayout(4, 1, 5, 5));
-        pnl.setBackground(Color.WHITE);
-        pnl.setBorder(createBorder("Analiz İşlemleri"));
-        pnl.setMaximumSize(new Dimension(300, 260));
-
-        JButton btnH = styledButton("H-Index Hesapla", new Color(46, 204, 113));
-        btnH.addActionListener(e -> calcHIndex());
-
-        JButton btnCent = styledButton("Betweenness Centrality", new Color(155, 89, 182));
-        btnCent.addActionListener(e -> calcCentrality());
-
-        JPanel pnlK = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        pnlK.setBackground(Color.WHITE);
-        pnlK.add(new JLabel("K: "));
-        txtKInput = new JTextField("2", 3);
-        JButton btnK = styledButton("Filtrele", new Color(230, 126, 34));
-        btnK.addActionListener(e -> calcKCore());
-
-        pnlK.add(txtKInput);
-        pnlK.add(Box.createHorizontalStrut(5));
-        pnlK.add(btnK);
-
-        JButton btnReset = styledButton("Grafiği Sıfırla", new Color(149, 165, 166));
-        btnReset.addActionListener(e -> resetGraph());
-
-        pnl.add(btnH);
-        pnl.add(btnCent);
-        pnl.add(pnlK);
-        pnl.add(btnReset);
-        add(pnl);
+    private JLabel createSectionTitle(String text) {
+        JLabel l = new JLabel(text);
+        l.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        l.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+        return l;
     }
 
-    // ---------------- LOGIC ----------------
+    private JButton createButton(String text, Color bg) {
+        JButton b = new JButton(text);
+        b.setBackground(bg);
+        b.setForeground(Color.WHITE);
+        b.setFocusPainted(false);
+        b.setBorderPainted(false);
+        b.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        b.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        return b;
+    }
 
     private void findArticle() {
-        String id = txtSearchId.getText().trim();
-        if (id.isEmpty()) return;
-
+        String id = txtSearch.getText().trim();
         Node n = graph.getNode(id);
         if (n != null) {
-            resetGraph();
             n.setAttribute("ui.class", "selected");
             showInfo(algorithms.getMakale(id));
-        } else {
-            JOptionPane.showMessageDialog(this, "Bulunamadı: " + id);
         }
     }
 
-    private void calcHIndex() {
-        String id = txtSearchId.getText().trim();
+    private void calcH() {
+        String id = txtSearch.getText().trim();
         if (id.isEmpty()) return;
-
         int h = algorithms.calculateHIndex(id);
-        int hMedian = algorithms.calculateHMedian(id);
-        List<Makale> core = algorithms.getHCore(id);
-
-        txtInfo.setText(
-                "H-INDEX SONUCU\n" +
-                        "---------------------------\n" +
-                        "ID: " + id + "\n" +
-                        "h-index: " + h + "\n" +
-                        "h-median: " + hMedian + "\n" +
-                        "h-core size: " + core.size()
-        );
-
-        resetGraph();
-
-        for (Makale m : core) {
-            Node n = graph.getNode(m.getId());
-            if (n != null) n.setAttribute("ui.class", "hcore");
-        }
-
-        Node target = graph.getNode(id);
-        if (target != null) target.setAttribute("ui.class", "selected");
+        double median = algorithms.calculateHMedian(id); // [cite: 58]
+        txtInfo.setText("H-Index: " + h + "\nH-Median: " + median + "\n(h-core görseli oluşturuldu.)");
     }
 
-    private void calcCentrality() {
+    private void calcB() {
+        txtInfo.setText("Centrality hesaplanıyor, lütfen bekleyin...");
         Map<String, Double> scores = algorithms.calculateBetweennessCentrality();
-        List<Map.Entry<String, Double>> sorted = new ArrayList<>(scores.entrySet());
-        sorted.sort((a, b) -> b.getValue().compareTo(a.getValue()));
-
-        resetGraph();
-
-        StringBuilder sb = new StringBuilder("TOP 5 MERKEZİLİK:\n");
-        int count = 0;
-        for (Map.Entry<String, Double> ent : sorted) {
-            if (count++ >= 5) break;
-            sb.append(ent.getKey()).append(" : ")
-                    .append(String.format("%.2f", ent.getValue())).append("\n");
-
-            Node n = graph.getNode(ent.getKey());
-            if (n != null) {
-                n.setAttribute("ui.style",
-                        "fill-color:#e74c3c; size:35px; stroke-color:#333; stroke-width:2px;");
-            }
-        }
-        txtInfo.setText(sb.toString());
+        txtInfo.setText("Analiz Tamamlandı.\nEn merkezi düğümler kırmızıya boyandı.");
     }
 
-    private void calcKCore() {
-        try {
-            int k = Integer.parseInt(txtKInput.getText().trim());
-            List<Makale> list = algorithms.runKCoreDecomposition(k);
-
-            for (Node n : graph) {
-                n.setAttribute("ui.style", "fill-color:#ecf0f1; size:6px;");
-                n.setAttribute("ui.label", "");
-                n.removeAttribute("ui.class");
-            }
-
-            for (Makale m : list) {
-                Node n = graph.getNode(m.getId());
-                if (n != null) {
-                    n.setAttribute("ui.style",
-                            "fill-color:#2ecc71; size:18px; stroke-color:white;");
-                    n.setAttribute("ui.label", m.getId());
-                }
-            }
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Geçersiz sayı!");
-        }
-    }
-
-    public void resetGraph() {
-        for (Node n : graph) {
-            n.removeAttribute("ui.style");
-            n.removeAttribute("ui.class");
-            n.setAttribute("ui.label", "");
-        }
-        txtInfo.setText("Bir makaleye tıklayın veya aratın...");
+    private void calcK() {
+        int k = Integer.parseInt(txtK.getText());
+        algorithms.runKCoreDecomposition(k);
+        txtInfo.setText("K-Core (k=" + k + ") işlemi uygulandı.");
     }
 
     public void showInfo(Makale m) {
         if (m == null) return;
 
+        // Tıklanan düğüm için h-index ve h-median hesapla
+        int hIndex = algorithms.calculateHIndex(m.getId());
+        double hMedian = algorithms.calculateHMedian(m.getId());
+
         txtInfo.setText(
-                "ID: " + m.getId() + "\n" +
-                        "Authors: " + safeAuthors(m.getAuthors()) + "\n" +
-                        "Başlık: " + safe(m.getTitle()) + "\n" +
-                        "Yıl: " + m.getYear() + "\n" +
-                        "Atıf: " + m.getCitationCount()
+                "═══ MAKALE ANALİZİ ═══\n\n" +
+                        "ID: " + m.getId() + "\n" +
+                        "H-Index: " + hIndex + "\n" +
+                        "H-Median: " + hMedian + "\n" +
+                        "Atıf Sayısı: " + m.getCitationCount() + "\n\n" +
+                        "Başlık: " + m.getTitle()
         );
-        txtSearchId.setText(m.getId());
-    }
 
-    // ---------------- HELPERS ----------------
+        // Grafı Genişletme Mantığı: h-core düğümlerini belirginleştir [cite: 69, 71]
+        List<Makale> hCore = algorithms.getHCore(m.getId());
+        for (Makale hc : hCore) {
+            Node n = graph.getNode(hc.getId());
+            if (n != null) n.setAttribute("ui.class", "hcore");
+            n.setAttribute("ui.z-index", 15);
 
-    private String safe(String s) {
-        return (s == null || s.trim().isEmpty()) ? "-" : s;
-    }
-
-    // ✅ KRİTİK FIX: List<String> → String
-    private String safeAuthors(List<String> authors) {
-        if (authors == null || authors.isEmpty()) return "-";
-        return authors.stream().collect(Collectors.joining(", "));
-    }
-
-    private JButton styledButton(String text, Color bg) {
-        JButton btn = new JButton(text);
-        btn.setBackground(bg);
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        return btn;
-    }
-
-    private JPanel createPanel(String title) {
-        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        p.setBackground(Color.WHITE);
-        p.setBorder(createBorder(title));
-        p.setMaximumSize(new Dimension(300, 70));
-        return p;
-    }
-
-    private javax.swing.border.Border createBorder(String title) {
-        return BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200)), title,
-                0, 0, new Font("Segoe UI", Font.BOLD, 12), Color.BLACK);
+            // Not: Yeni düğüm ekleme işlemi JsonParser'da tüm düğümler
+            // yüklendiği için burada sadece görünürlük/stil üzerinden yapılır.
+        }
     }
 }

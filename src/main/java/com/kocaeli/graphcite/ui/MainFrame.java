@@ -3,129 +3,217 @@ package com.kocaeli.graphcite.ui;
 import com.kocaeli.graphcite.graph.GraphAlgorithms;
 import com.kocaeli.graphcite.graph.GraphManager;
 import com.kocaeli.graphcite.model.Makale;
-import com.kocaeli.graphcite.ui.ControlPanel;
-import com.kocaeli.graphcite.ui.StatsPanel;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
-import org.graphstream.ui.view.Viewer;
+import org.graphstream.ui.geom.Point3;
 import org.graphstream.ui.swingViewer.ViewPanel;
+import org.graphstream.ui.view.Viewer;
 import org.graphstream.ui.view.ViewerListener;
 import org.graphstream.ui.view.ViewerPipe;
+import org.graphstream.ui.graphicGraph.GraphicElement;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
 import java.util.List;
 
 public class MainFrame extends JFrame implements ViewerListener {
 
-    private GraphAlgorithms algorithms;
-    private Graph graph;
-    private ControlPanel controlPanel; // Sağ paneli burada tutuyoruz
-    private ViewerPipe fromViewer;
+    private final Graph graph;
+    private final GraphAlgorithms algorithms;
+    private final ControlPanel controlPanel;
+    private final ArticleInfoPanel articleInfoPanel;
+    private final ViewerPipe pipe;
+
+    private boolean viewReady = false; // 🔒 Camera/NPE kilidi
 
     public MainFrame(List<Makale> makaleler) {
-        setTitle("GraphCite - Makale Graf Analiz Sistemi");
-        setSize(1300, 800);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setTitle("GraphCite – Makale Graf Analiz Sistemi");
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // 1. Backend Kurulumu
-        this.algorithms = new GraphAlgorithms(makaleler);
-        GraphManager manager = new GraphManager(makaleler);
-        this.graph = manager.createGraph();
+        algorithms = new GraphAlgorithms(makaleler);
+        graph = new GraphManager(makaleler).createGraph();
 
-        // 2. Grafik Görselleştirme
+        applyGraphStyle(graph);
+
         Viewer viewer = new Viewer(graph, Viewer.ThreadingModel.GRAPH_IN_ANOTHER_THREAD);
-        viewer.enableAutoLayout();
+        viewer.enableAutoLayout(
+                new org.graphstream.ui.layout.springbox.implementations.SpringBox()
+        );
 
-        // [YENİ] Mouse üzerine gelince otomatik etiket açılması için:
-        graph.setAttribute("ui.quality");
-        graph.setAttribute("ui.antialias");
+        ViewPanel view = viewer.addDefaultView(false);
+        view.setBackground(new Color(248, 250, 252));
 
-        // ViewPanel ayarı (Mouse takibi için)
-        ViewPanel viewPanel = viewer.addDefaultView(false);
-        add(viewPanel, BorderLayout.CENTER);
+        setupZoom(view);
+        setupMouseInteraction(view);
 
-        // Mouse bir düğümün üzerindeyken ID'sini gösteren basit Hover mantığı
-        // (GraphStream'de tam CSS tooltip zordur, en temizi node etiketini açıp kapatmaktır)
-        new Timer(100, e -> {
-            Point mousePos = MouseInfo.getPointerInfo().getLocation();
-            SwingUtilities.convertPointFromScreen(mousePos, viewPanel);
-            // Burada karmaşık ray-casting yerine, GraphStream'in kendi etkileşimini kullanıyoruz.
-            // Eğer tıklama (click) zaten çalışıyorsa, hover için ekstra kod karmaşasına girmeyelim,
-            // çünkü tıklama özelliği PDF'in "tıklayınca genişlet" isteğini karşılıyor.
-        }).start();
+        add(view, BorderLayout.CENTER);
 
-        // 3. Sağ Tarafı Oluştur (MODÜLER YAPI)
-        JPanel rightSideBar = new JPanel();
-        rightSideBar.setLayout(new BoxLayout(rightSideBar, BoxLayout.Y_AXIS));
-        rightSideBar.setPreferredSize(new Dimension(320, 0));
-        rightSideBar.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        rightSideBar.setBackground(Color.WHITE);
+        controlPanel = new ControlPanel(algorithms, graph);
+        articleInfoPanel = new ArticleInfoPanel();
 
-        // İstatistik Paneli
-        StatsPanel statsPanel = new StatsPanel(makaleler);
-        rightSideBar.add(statsPanel);
+        add(buildSidebar(makaleler), BorderLayout.EAST);
 
-        rightSideBar.add(Box.createVerticalStrut(10));
+        pipe = viewer.newViewerPipe();
+        pipe.addViewerListener(this);
+        new Timer(40, e -> pipe.pump()).start();
 
-        // Kontrol Paneli (Butonlar vs.)
-        this.controlPanel = new ControlPanel(algorithms, graph);
-        rightSideBar.add(controlPanel);
-
-        add(rightSideBar, BorderLayout.EAST);
-
-        // 4. Etkileşim (Tıklama Dinleyici)
-        fromViewer = viewer.newViewerPipe();
-        fromViewer.addViewerListener(this);
-        fromViewer.addSink(graph);
-        new Timer(50, e -> fromViewer.pump()).start();
+        // 🔥 layout oturana kadar mouse kapalı
+        new Timer(500, e -> viewReady = true).start();
     }
 
-    // --- Viewer Listener (Tıklama Yakalama) ---
-    @Override
-    public void viewClosed(String viewName) { }
+    /* ------------------ ZOOM ------------------ */
+    private void setupZoom(ViewPanel view) {
+        view.addMouseWheelListener(e -> {
+            double zoomFactor = e.getWheelRotation() < 0 ? 0.85 : 1.15;
 
-    // MainFrame.java içinde buttonPushed ve MouseOver kısımlarını güncelle:
+            Point3 before = view.getCamera().transformPxToGu(e.getX(), e.getY());
+            view.getCamera().setViewPercent(view.getCamera().getViewPercent() * zoomFactor);
+            Point3 after = view.getCamera().transformPxToGu(e.getX(), e.getY());
 
+            view.getCamera().setViewCenter(
+                    view.getCamera().getViewCenter().x + (before.x - after.x),
+                    view.getCamera().getViewCenter().y + (before.y - after.y),
+                    0
+            );
+        });
+    }
+
+    /* ------------------ NODE INTERACTION ------------------ */
+    private void setupMouseInteraction(ViewPanel view) {
+        MouseAdapter adapter = new MouseAdapter() {
+            String hoverId = null;
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (!viewReady) return;
+
+                GraphicElement ge = view.findNodeOrSpriteAt(e.getX(), e.getY());
+                if (ge != null) {
+                    buttonPushed(ge.getId());
+                }
+            }
+
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                if (!viewReady) return;
+
+                GraphicElement ge = view.findNodeOrSpriteAt(e.getX(), e.getY());
+
+                if (ge != null) {
+                    String id = ge.getId();
+                    if (!id.equals(hoverId)) {
+                        if (hoverId != null) mouseLeft(hoverId);
+                        hoverId = id;
+                        mouseOver(id);
+                    }
+                } else if (hoverId != null) {
+                    mouseLeft(hoverId);
+                    hoverId = null;
+                }
+            }
+        };
+
+        view.addMouseListener(adapter);
+        view.addMouseMotionListener(adapter);
+    }
+
+    /* ------------------ STYLE ------------------ */
+    private void applyGraphStyle(Graph g) {
+        g.setAttribute("ui.stylesheet", """
+            graph {
+                padding: 60px;
+                fill-color: #f8fafc;
+            }
+            node {
+                size: 12px;
+                fill-color: #3b82f6;
+                stroke-mode: plain;
+                stroke-color: #1e40af;
+                text-size: 11px;
+                shape: circle;
+                text-alignment: under;
+                text-color: #0f172a;
+            }
+            node.selected {
+                fill-color: #facc15;
+                size: 22px;
+            }
+            node.hcore {
+                fill-color: #ef4444;
+                size: 18px;
+            }
+            edge {
+                size: 1px;
+                fill-color: #64748b;
+                arrow-shape: arrow;
+            }
+        """);
+        g.setAttribute("ui.quality");
+        g.setAttribute("ui.antialias");
+    }
+
+    /* ------------------ SIDEBAR ------------------ */
+    private JPanel buildSidebar(List<Makale> makaleler) {
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setPreferredSize(new Dimension(360, 0));
+
+        JPanel header = new JPanel();
+        header.setBackground(new Color(30, 41, 59));
+        JLabel t = new JLabel("GraphCite");
+        t.setForeground(Color.WHITE);
+        t.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        header.add(t);
+
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.add(new StatsPanel(makaleler));
+        content.add(controlPanel);
+        content.add(articleInfoPanel);
+
+        wrapper.add(header, BorderLayout.NORTH);
+        wrapper.add(new JScrollPane(content), BorderLayout.CENTER);
+        return wrapper;
+    }
+
+    /* ------------------ VIEWER CALLBACKS ------------------ */
     @Override
     public void buttonPushed(String id) {
-        // 1. Bilgi Göster
         Makale m = algorithms.getMakale(id);
+        if (m == null) return;
+
+        // info paneller
         controlPanel.showInfo(m);
+        articleInfoPanel.update(
+                m,
+                algorithms.calculateHIndex(id),
+                (int) algorithms.calculateHMedian(id)
+        );
 
-        // 2. GENİŞLETME MANTIĞI
-        // PDF: "Tıklanan düğümün h-core düğümleri mevcut graf yapısına entegre edilmeli"
-        List<Makale> hCore = algorithms.getHCore(id);
+        // reset
+        for (Node n : graph) n.removeAttribute("ui.class");
 
-        for (Makale hcMakale : hCore) {
-            Node n = graph.getNode(hcMakale.getId());
-            if (n != null) {
-                n.setAttribute("ui.class", "hcore"); // Görsel olarak farklılaştır
+        Node center = graph.getNode(id);
+        if (center != null) center.setAttribute("ui.class", "selected");
 
-                // PDF: "Önceki ve yeni eklenen düğümler arasındaki referans ilişkileri kontrol edilmeli" [cite: 71]
-                // Not: Biz başlangıçta tüm grafı yüklediğimiz için kenarlar zaten var.
-                // Sadece bu düğümleri belirginleştiriyoruz.
-            }
+        for (Makale hc : algorithms.getHCore(id)) {
+            Node n = graph.getNode(hc.getId());
+            if (n != null) n.setAttribute("ui.class", "hcore");
         }
     }
 
-    // Tooltip İsteri: Mouse üzerine gelince ID göster
-    public void mouseOver(String id) {
+    private void mouseOver(String id) {
         Node n = graph.getNode(id);
-        if (n != null) {
-            Makale m = (Makale) n.getAttribute("data");
-            // Tooltip olarak ID ve Atıf sayısını düğüm üstünde göster
-            n.setAttribute("ui.label", id + " (Atıf: " + m.getCitationCount() + ")");
-            n.setAttribute("ui.style", "text-mode: normal; text-background-mode: plain; text-background-color: white;");
-        }
+        if (n != null) n.setAttribute("ui.label", id);
     }
 
-    public void mouseLeft(String id) {
+    private void mouseLeft(String id) {
         Node n = graph.getNode(id);
-        if (n != null) n.setAttribute("ui.style", "text-mode: hidden;");
+        if (n != null) n.removeAttribute("ui.label");
     }
 
-    @Override
-    public void buttonReleased(String id) { }
+    @Override public void buttonReleased(String id) {}
+    @Override public void viewClosed(String viewName) {}
 }
