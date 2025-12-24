@@ -12,7 +12,8 @@ import org.graphstream.ui.graphicGraph.GraphicElement;
 import org.graphstream.ui.view.ViewerListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.graphstream.ui.spriteManager.Sprite;
+import org.graphstream.ui.spriteManager.SpriteManager;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -30,6 +31,10 @@ public class MainFrame extends JFrame implements ViewerListener {
     private final ArticleInfoPanel articleInfoPanel;
     private final ControlPanel controlPanel;
 
+    private SpriteManager spriteManager;
+    private Sprite hoverCard;
+    private String lastHoverId;
+
     private final ViewerPipe pipe;
     private boolean viewReady = false;
 
@@ -45,6 +50,18 @@ public class MainFrame extends JFrame implements ViewerListener {
         algorithms = new GraphAlgorithms(this.makaleler);
         graphManager = new GraphManager(this.makaleler);
         graph = graphManager.createGraph();
+
+        // --- Hover card (sprite) init ---
+        try {
+            spriteManager = new SpriteManager(graph);
+            hoverCard = spriteManager.addSprite("hoverCard");
+            hoverCard.setAttribute("ui.class", "hoverCard");
+            hoverCard.setAttribute("ui.hide");
+        } catch (Exception ex) {
+            logger.warn("SpriteManager/hoverCard init başarısız", ex);
+            spriteManager = null;
+            hoverCard = null;
+        }
 
         // Apply any additional style (GraphManager already sets base stylesheet)
         applyGraphStyle(graph);
@@ -204,8 +221,34 @@ public class MainFrame extends JFrame implements ViewerListener {
         if (view == null) { logger.warn("centerOnNodeAnimated: view null"); return; }
         org.graphstream.graph.Node n = graph.getNode(nodeId);
         if (n == null) { logger.debug("centerOnNodeAnimated: node bulunamadı: {}", nodeId); return; }
-        Double nx = n.getAttribute("x"); Double ny = n.getAttribute("y");
-        if (nx == null || ny == null) { logger.warn("Düğüm koordinatları yok: {}", nodeId); return; }
+        Double nx = null, ny = null;
+
+// ✅ 1) Önce xyz dene (GraphStream autolayout çoğu zaman bunu kullanır)
+        try {
+            double[] xyz = n.getAttribute("xyz");
+            if (xyz != null && xyz.length >= 2) {
+                nx = xyz[0];
+                ny = xyz[1];
+            }
+        } catch (Exception ignored) {}
+
+// ✅ 2) xyz yoksa x/y dene (senin manuel setlediğin olabilir)
+        if (nx == null || ny == null) {
+            try {
+                Object ox = n.getAttribute("x");
+                Object oy = n.getAttribute("y");
+                if (ox instanceof Number && oy instanceof Number) {
+                    nx = ((Number) ox).doubleValue();
+                    ny = ((Number) oy).doubleValue();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        if (nx == null || ny == null) {
+            logger.warn("Düğüm koordinatları yok: {}", nodeId);
+            return;
+        }
+
 
         final double startX = view.getCamera().getViewCenter().x;
         final double startY = view.getCamera().getViewCenter().y;
@@ -242,20 +285,36 @@ public class MainFrame extends JFrame implements ViewerListener {
                 if (!viewReady) return;
                 try {
                     GraphicElement ge = view.findNodeOrSpriteAt(e.getX(), e.getY());
-                    if (ge != null) {
-                        // ViewerListener.buttonPushed ile aynı etkiyi tetikle
-                        buttonPushed(ge.getId());
-                    }
-                } catch (Exception ex) { logger.debug("mouseClicked hata: ", ex); }
+                    if (ge == null) return;
+
+                    String id = ge.getId();
+                    // SADECE graph’ta node olan ID’lere izin ver
+                    if (graph.getNode(id) == null) return;
+
+                    buttonPushed(id);
+                } catch (Exception ex) {
+                    logger.debug("mouseClicked hata: ", ex);
+                }
             }
+
             @Override public void mouseMoved(MouseEvent e) {
                 if (!viewReady) return;
                 try {
                     GraphicElement ge = view.findNodeOrSpriteAt(e.getX(), e.getY());
                     if (ge != null) {
                         String id = ge.getId();
-                        if (!id.equals(hoverId)) { if (hoverId != null) mouseLeft(hoverId); hoverId = id; mouseOver(id); }
-                    } else if (hoverId != null) { mouseLeft(hoverId); hoverId = null; }
+                        if (graph.getNode(id) == null) return; // sadece node
+                        if (!id.equals(hoverId)) {
+                            if (hoverId != null) { mouseLeft(hoverId); hideHoverCard(); }
+                            hoverId = id;
+                            mouseOver(id);
+                            showHoverCard(id);
+                        }
+                    } else if (hoverId != null) {
+                        mouseLeft(hoverId);
+                        hideHoverCard();
+                        hoverId = null;
+                    }
                 } catch (Exception ex) { logger.debug("mouseMoved hata: ", ex); }
             }
         };
@@ -303,6 +362,37 @@ public class MainFrame extends JFrame implements ViewerListener {
         } catch (Exception ex) {
             logger.debug("buttonPushed sırasında hata: ", ex);
         }
+    }
+
+    private void showHoverCard(String nodeId) {
+        if (hoverCard == null) return;
+        Makale m = algorithms.getMakale(nodeId);
+        if (m == null) return;
+
+        String authors = (m.getAuthors() == null) ? "-" : String.join(", ", m.getAuthors());
+        String title = (m.getTitle() == null) ? "-" : m.getTitle();
+        int citedBy = m.getCitationCount();
+
+        String text =
+                "ID: " + m.getId() + "\n" +
+                        "Year: " + m.getYear() + "\n" +
+                        "Authors: " + authors + "\n" +
+                        "CitedBy: " + citedBy + "\n" +
+                        "Title: " + title;
+
+        try {
+            hoverCard.attachToNode(nodeId);
+            hoverCard.setAttribute("ui.label", text);
+            hoverCard.removeAttribute("ui.hide");
+        } catch (Exception ignored) {}
+    }
+
+    private void hideHoverCard() {
+        if (hoverCard == null) return;
+        try {
+            hoverCard.setAttribute("ui.hide");
+            hoverCard.setAttribute("ui.label", "");
+        } catch (Exception ignored) {}
     }
 
     @Override public void buttonReleased(String id) {}

@@ -171,6 +171,92 @@ public class GraphAlgorithms {
         return centralityScores;
     }
 
+    // ✅ Daha hızlı: Brandes (unweighted, undirected gibi)
+    public Map<String, Double> calculateBetweennessCentralityBrandes(Set<String> nodeSubset) {
+
+        // Subset null/empty ise tüm node'lar
+        Set<String> nodes = (nodeSubset == null || nodeSubset.isEmpty())
+                ? new HashSet<>(makaleMap.keySet())
+                : new HashSet<>(nodeSubset);
+
+        // Adjacency (senin mevcut yaklaşımın gibi UNDIRECTED kuruyoruz)
+        Map<String, List<String>> adj = new HashMap<>();
+        for (String id : nodes) adj.put(id, new ArrayList<>());
+
+        for (String id : nodes) {
+            Makale m = makaleMap.get(id);
+            if (m == null || m.getReferencedWorkIds() == null) continue;
+
+            for (String ref : m.getReferencedWorkIds()) {
+                if (!nodes.contains(ref)) continue;
+
+                // duplicate engelle
+                List<String> a = adj.get(id);
+                if (!a.contains(ref)) a.add(ref);
+
+                List<String> b = adj.get(ref);
+                if (!b.contains(id)) b.add(id);
+            }
+        }
+
+        Map<String, Double> CB = new HashMap<>();
+        for (String v : nodes) CB.put(v, 0.0);
+
+        for (String s : nodes) {
+            Deque<String> S = new ArrayDeque<>();
+            Map<String, List<String>> P = new HashMap<>();
+            Map<String, Integer> dist = new HashMap<>();
+            Map<String, Double> sigma = new HashMap<>();
+
+            for (String v : nodes) {
+                P.put(v, new ArrayList<>());
+                dist.put(v, -1);
+                sigma.put(v, 0.0);
+            }
+
+            dist.put(s, 0);
+            sigma.put(s, 1.0);
+
+            ArrayDeque<String> Q = new ArrayDeque<>();
+            Q.add(s);
+
+            while (!Q.isEmpty()) {
+                String v = Q.poll();
+                S.push(v);
+
+                for (String w : adj.getOrDefault(v, List.of())) {
+                    if (dist.get(w) == -1) {
+                        dist.put(w, dist.get(v) + 1);
+                        Q.add(w);
+                    }
+                    if (dist.get(w) == dist.get(v) + 1) {
+                        sigma.put(w, sigma.get(w) + sigma.get(v));
+                        P.get(w).add(v);
+                    }
+                }
+            }
+
+            Map<String, Double> delta = new HashMap<>();
+            for (String v : nodes) delta.put(v, 0.0);
+
+            while (!S.isEmpty()) {
+                String w = S.pop();
+                for (String v : P.get(w)) {
+                    double c = (sigma.get(v) / sigma.get(w)) * (1.0 + delta.get(w));
+                    delta.put(v, delta.get(v) + c);
+                }
+                if (!w.equals(s)) {
+                    CB.put(w, CB.get(w) + delta.get(w));
+                }
+            }
+        }
+
+        // Undirected kurduğun için 2'ye böl
+        for (String v : nodes) CB.put(v, CB.get(v) / 2.0);
+
+        return CB;
+    }
+
     private Map<String, Integer> runBFS(String startNode,
                                         Map<String, List<String>> adjList) {
         Map<String, Integer> distances = new HashMap<>();

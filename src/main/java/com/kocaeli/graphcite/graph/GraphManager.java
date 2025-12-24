@@ -32,17 +32,44 @@ public class GraphManager {
         graph.clear();
 
         graph.setAttribute("ui.stylesheet", """
-                graph { padding: 60px; fill-color: #f8fafc; }
-                node { size: 12px; fill-color: #3b82f6; stroke-mode: plain; stroke-color: #1e40af; text-size: 11px; }
-                node.selected { fill-color: #facc15; size: 22px; }
-                node.hcore { fill-color: #ef4444; size: 18px; }
-                node.newlyAdded { fill-color: #22c55e; size: 16px; }
-                node.betweenness { fill-color: #a855f7; size: 18px; stroke-mode: plain; stroke-color: #581c87; }
-                node.kcore { fill-color: #f97316; size: 16px; stroke-mode: plain; stroke-color: #9a3412; }
-                edge { fill-color: #64748b; size: 1px; arrow-size: 8px,4px; }
-                edge.timeline { fill-color: #10b981; size: 1px; arrow-size: 8px,4px; }
-                edge.blackEdge { fill-color: #64748b; size: 1px; arrow-size: 8px,4px; }
-                """);
+graph { padding: 60px; fill-color: #f8fafc; }
+
+node {
+  size: 12px;
+  fill-color: #3b82f6;
+  stroke-mode: plain;
+  stroke-color: #1e40af;
+  text-size: 11px;
+  text-color: #0f172a;
+  text-background-mode: rounded-box;
+  text-background-color: rgba(255,255,255,200);
+  text-padding: 2px, 4px;
+}
+
+node.selected { fill-color: #facc15; size: 22px; }
+node.hcore { fill-color: #ef4444; size: 18px; }
+node.newlyAdded { fill-color: #22c55e; size: 16px; }
+node.betweenness { fill-color: #a855f7; size: 18px; stroke-mode: plain; stroke-color: #581c87; }
+node.kcore { fill-color: #f97316; size: 16px; stroke-mode: plain; stroke-color: #9a3412; }
+
+edge { fill-color: #64748b; size: 1px; arrow-size: 8px,4px; }
+edge.blackEdge { fill-color: #64748b; size: 1px; arrow-size: 8px,4px; }
+edge.timeline { fill-color: #10b981; size: 1px; arrow-size: 8px,4px; }
+edge.timelineEdge { fill-color: #10b981; size: 1px; arrow-size: 8px,4px; }
+
+edge.kcoreEdge { fill-color: #f97316; size: 2px; arrow-size: 9px,5px; }
+
+sprite.hoverCard {
+  text-size: 12;
+  text-color: white;
+  text-background-mode: rounded-box;
+  text-background-color: rgba(15,23,42,220);
+  text-padding: 6px, 8px;
+  text-offset: 12px, -18px;
+  text-alignment: at-right;
+  z-index: 10;
+}
+""");
 
         graph.setAttribute("ui.antialias");
         graph.setAttribute("ui.quality");
@@ -59,15 +86,35 @@ public class GraphManager {
         if (id.isEmpty()) return;
 
         synchronized (graph) {
-            if (graph.getNode(id) != null) return;
+            Node n = graph.getNode(id);
+
+            // Node yoksa ekle
+            if (n == null) {
+                try {
+                    n = graph.addNode(id);
+                    n.setAttribute("citationCount", 0);
+                } catch (Exception e) {
+                    logger.debug("ensureNode addNode hata: id={}", id, e);
+                    return;
+                }
+            }
+
+            // ✅ Node varsa bile xyz yoksa ver (kritik!)
             try {
-                Node n = graph.addNode(id);
-                n.setAttribute("citationCount", 0);
-            } catch (Exception e) {
-                logger.debug("ensureNode sırasında hata: id={}", id, e);
+                double[] xyz = n.getAttribute("xyz");
+                if (xyz == null || xyz.length < 2) {
+                    double x = (id.hashCode() % 2000) / 200.0;
+                    double y = ((id.hashCode() / 2000) % 2000) / 200.0;
+                    n.setAttribute("xyz", x, y, 0);
+                }
+            } catch (Exception ex) {
+                double x = (id.hashCode() % 2000) / 200.0;
+                double y = ((id.hashCode() / 2000) % 2000) / 200.0;
+                n.setAttribute("xyz", x, y, 0);
             }
         }
     }
+
 
     /**
      * Tek ve kesin ensureDirectedEdge implementasyonu.

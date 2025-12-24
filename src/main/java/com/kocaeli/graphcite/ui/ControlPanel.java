@@ -169,7 +169,21 @@ public class ControlPanel extends JPanel {
         // H-core düğümlerine özel sınıf atama
         applyNodeClassesForHCore(hcore);
 
-        if (focusHandler != null) focusHandler.accept(cid);
+        // ✅ seçileni belirgin yap
+        for (Node n : graph) {
+            Object cls = n.getAttribute("ui.class");
+            if ("selected".equals(cls)) n.removeAttribute("ui.class");
+        }
+        Node selected = graph.getNode(cid);
+        if (selected != null) selected.setAttribute("ui.class", "selected");
+
+// ✅ layout'a zaman ver, sonra odakla (150ms)
+        if (focusHandler != null) {
+            new javax.swing.Timer(150, ev -> {
+                ((javax.swing.Timer) ev.getSource()).stop();
+                focusHandler.accept(cid);
+            }).start();
+        }
     }
 
     private void applyNodeClassesForHCore(List<Makale> hcore) {
@@ -181,41 +195,60 @@ public class ControlPanel extends JPanel {
                 n.setAttribute("ui.class", "hcore");
             } else {
                 Object cls = n.getAttribute("ui.class");
-                if ("hcore".equals(cls)) n.removeAttribute("ui.class");
+                if ("betweenness".equals(cls) || "kcore".equals(cls)) continue;
             }
         }
     }
 
     private void onBetweenness(ActionEvent e) {
-        try {
-            Map<String, Double> scores = algorithms.calculateBetweennessCentrality();
-            if (scores == null || scores.isEmpty()) {
-                txtLog.setText("Betweenness hesaplanamadı veya sonuç boş.");
-                return;
+        // UI'da şu an görünen düğümlerle sınırla (en kritik optimizasyon)
+        Set<String> visible = new HashSet<>();
+        for (org.graphstream.graph.Node n : graph) visible.add(n.getId());
+
+        txtLog.setText("Betweenness hesaplanıyor... (" + visible.size() + " düğüm)");
+        JButton src = (JButton) e.getSource();
+        src.setEnabled(false);
+
+        SwingWorker<Map<String, Double>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Map<String, Double> doInBackground() {
+                // Yeni yazacağımız hızlı yöntem:
+                return algorithms.calculateBetweennessCentralityBrandes(visible);
             }
 
-            // Tüm düğümlere betweenness değeri ata
-            double max = scores.values().stream().mapToDouble(Double::doubleValue).max().orElse(1.0);
-            for (Map.Entry<String, Double> en : scores.entrySet()) {
-                Node n = graph.getNode(en.getKey());
-                if (n != null) {
-                    n.setAttribute("betweenness", en.getValue());
-                    // normalize edip sınıf atama: üst %10'u vurgula
-                    if (en.getValue() >= 0.9 * max) {
-                        n.setAttribute("ui.class", "betweenness");
-                    } else {
-                        Object cls = n.getAttribute("ui.class");
-                        if ("betweenness".equals(cls)) n.removeAttribute("ui.class");
+            @Override
+            protected void done() {
+                try {
+                    Map<String, Double> scores = get();
+                    if (scores == null || scores.isEmpty()) {
+                        txtLog.setText("Betweenness hesaplanamadı veya boş.");
+                        return;
                     }
+
+                    double max = scores.values().stream().mapToDouble(Double::doubleValue).max().orElse(1.0);
+
+                    for (Map.Entry<String, Double> en : scores.entrySet()) {
+                        org.graphstream.graph.Node n = graph.getNode(en.getKey());
+                        if (n == null) continue;
+
+                        n.setAttribute("betweenness", en.getValue());
+                        if (en.getValue() >= 0.9 * max) n.setAttribute("ui.class", "betweenness");
+                        else if ("betweenness".equals(n.getAttribute("ui.class"))) n.removeAttribute("ui.class");
+                    }
+
+                    txtLog.setText("Betweenness bitti. Max=" + max);
+                    statsPanel.update(graph);
+                } catch (Exception ex) {
+                    txtLog.setText("Betweenness hata: " + ex.getMessage());
+                } finally {
+                    src.setEnabled(true);
                 }
             }
+        };
 
-            txtLog.setText("Betweenness centrality hesaplandı. En yüksek değer: " + max);
-            statsPanel.update(graph);
-        } catch (Exception ex) {
-            txtLog.setText("Betweenness hesaplama sırasında hata: " + ex.getMessage());
-        }
+        worker.execute();
     }
+
 
     private void onKCore(ActionEvent e) {
         String kText = txtK.getText().trim();
