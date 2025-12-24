@@ -3,7 +3,6 @@ package com.kocaeli.graphcite.ui;
 import com.kocaeli.graphcite.graph.GraphManager;
 import com.kocaeli.graphcite.graph.GraphAlgorithms;
 import com.kocaeli.graphcite.model.Makale;
-import org.graphstream.graph.Edge;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 
@@ -71,6 +70,7 @@ public class ControlPanel extends JPanel {
         txtK.setBackground(new Color(51, 65, 85));
         txtK.setForeground(Color.WHITE);
         txtK.setCaretColor(Color.WHITE);
+
         add(new JLabel("k değeri") {{ setForeground(new Color(148,163,184)); setFont(new Font("Segoe UI", Font.PLAIN, 11)); }});
         add(txtK);
         add(Box.createVerticalStrut(8));
@@ -80,6 +80,7 @@ public class ControlPanel extends JPanel {
         add(btnBetweenness);
 
         add(Box.createVerticalStrut(8));
+
         JButton btnKCore = createBtn("K-Core Uygula", new Color(245, 158, 11));
         btnKCore.addActionListener(this::onKCore);
         add(btnKCore);
@@ -120,12 +121,11 @@ public class ControlPanel extends JPanel {
             return;
         }
 
-        // Mevcut stylesheet'i koruyup grafı temizle
-        Object ss = graph.getAttribute("ui.stylesheet");
-        graph.clear();
-        if (ss != null) graph.setAttribute("ui.stylesheet", ss);
+        // --- DÜZELTME: Grafı temizleme kodu KALDIRILDI ---
+        // graph.clear();  <-- SİLİNDİ
+        // inGraph.clear(); <-- SİLİNDİ
+        // Artık yeni düğümler eskilerin üzerine eklenerek "graf genişletiliyor".
 
-        inGraph.clear();
         showInfo(m);
     }
 
@@ -148,6 +148,7 @@ public class ControlPanel extends JPanel {
         }
 
         // inGraph içindeki düğümler arasındaki referansları ekle
+        // Bu döngü, yeni eklenen düğümlerle eskiler arasındaki bağlantıları da kurar.
         for (String from : new HashSet<>(inGraph)) {
             Makale f = algorithms.getMakale(from);
             if (f == null) continue;
@@ -158,7 +159,7 @@ public class ControlPanel extends JPanel {
             }
         }
 
-        // timeline kenarlarını yeniden oluştur
+        // timeline (yeşil) kenarlarını yeniden oluştur
         graphManager.rebuildTimelineEdges();
 
         // Stats ve info panel güncelle

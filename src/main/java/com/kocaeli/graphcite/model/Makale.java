@@ -49,4 +49,17 @@ public class Makale {
     public String toString() {
         return "Makale{" + "id='" + id + '\'' + ", title='" + title + '\'' + '}';
     }
+
+ //test
+ public long getIdAsLong() {
+     try {
+         // ID sadece sayı ise direkt parse et
+         return Long.parseLong(this.id);
+     } catch (NumberFormatException e) {
+         // Eğer ID "https://.../W12345" formatındaysa sadece sondaki sayıyı çek
+         String numericPart = this.id.replaceAll("[^0-9]", "");
+         if (numericPart.isEmpty()) return 0;
+         return Long.parseLong(numericPart);
+     }
+ }
 }

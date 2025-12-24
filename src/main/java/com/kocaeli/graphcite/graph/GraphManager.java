@@ -40,7 +40,7 @@ public class GraphManager {
                 node.betweenness { fill-color: #a855f7; size: 18px; stroke-mode: plain; stroke-color: #581c87; }
                 node.kcore { fill-color: #f97316; size: 16px; stroke-mode: plain; stroke-color: #9a3412; }
                 edge { fill-color: #64748b; size: 1px; arrow-size: 8px,4px; }
-                edge.timeline { fill-color: #10b981; size: 1px; }
+                edge.timeline { fill-color: #10b981; size: 1px; arrow-size: 8px,4px; }
                 edge.blackEdge { fill-color: #64748b; size: 1px; arrow-size: 8px,4px; }
                 """);
 
@@ -100,6 +100,7 @@ public class GraphManager {
     public void rebuildTimelineEdges() {
         synchronized (graph) {
             try {
+                // 1. Mevcut yeşil (timeline) kenarları temizle
                 List<Edge> toRemove = new ArrayList<>();
                 for (Edge e : graph.getEdgeSet()) {
                     Boolean tl = e.getAttribute("timeline");
@@ -111,10 +112,20 @@ public class GraphManager {
                     }
                 }
 
+                // 2. Graf üzerindeki düğüm ID'lerini al
                 List<String> ids = new ArrayList<>();
                 for (Node n : graph) ids.add(n.getId());
-                Collections.sort(ids);
 
+                // --- DEĞİŞİKLİK: Sayısal Sıralama ---
+                // ID'leri içindeki sayısal değere göre sırala (Meryem Hoca'nın uyarısı) [cite: 17, 114]
+                ids.sort((id1, id2) -> {
+                    long n1 = extractNumber(id1);
+                    long n2 = extractNumber(id2);
+                    return Long.compare(n1, n2);
+                });
+                // ------------------------------------
+
+                // 3. Sıralı ID'ler arasında yeşil kenar oluştur
                 for (int i = 0; i < ids.size() - 1; i++) {
                     String a = ids.get(i);
                     String b = ids.get(i + 1);
@@ -122,7 +133,8 @@ public class GraphManager {
                     if (graph.getEdge(gid) != null) continue;
 
                     try {
-                        Edge ge = graph.addEdge(gid, a, b, false);
+                        // true -> Yönlü kenar (PDF Şekil 1'e uygun)
+                        Edge ge = graph.addEdge(gid, a, b, true);
                         if (ge != null) {
                             ge.setAttribute("ui.class", "timeline");
                             ge.setAttribute("timeline", true);
@@ -140,5 +152,21 @@ public class GraphManager {
     private String sanitizeId(String id) {
         if (id == null) return "";
         return id.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+    }
+
+    /**
+     * ID stringinden sayısal değeri çeker.
+     * Örn: "https://openalex.org/W2756105776" -> 2756105776
+     */
+    private long extractNumber(String id) {
+        if (id == null) return 0;
+        try {
+            // Sadece rakamları bırak, gerisini sil
+            String numeric = id.replaceAll("[^0-9]", "");
+            if (numeric.isEmpty()) return 0;
+            return Long.parseLong(numeric);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }
