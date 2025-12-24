@@ -5,16 +5,20 @@ import org.graphstream.graph.Edge;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 public class GraphManager {
 
+    private static final Logger logger = LoggerFactory.getLogger(GraphManager.class);
+
     private final Graph graph;
     private final List<Makale> data;
 
     public GraphManager(List<Makale> makaleler) {
-        this.data = makaleler;
+        this.data = makaleler == null ? Collections.emptyList() : makaleler;
 
         System.setProperty(
                 "org.graphstream.ui.renderer",
@@ -28,74 +32,113 @@ public class GraphManager {
         graph.clear();
 
         graph.setAttribute("ui.stylesheet", """
-                    graph {
-                        padding: 60px;
-                        fill-color: #f8fafc;
-                    }
-                    node {
-                        size: 12px;
-                        fill-color: #3b82f6;
-                        stroke-mode: plain;
-                        stroke-color: #1e40af;
-                        text-size: 12px;
-                    }
-                    node.selected {
-                        fill-color: #facc15;
-                        size: 22px;
-                    }
-                    node.hcore {
-                        fill-color: #ef4444;
-                        size: 18px;
-                    }
-                    edge {
-                        fill-color: #94a3b8;
-                        size: 1px;
-                        arrow-size: 8px,4px;
-                    }
+                graph { padding: 60px; fill-color: #f8fafc; }
+                node { size: 12px; fill-color: #3b82f6; stroke-mode: plain; stroke-color: #1e40af; text-size: 11px; }
+                node.selected { fill-color: #facc15; size: 22px; }
+                node.hcore { fill-color: #ef4444; size: 18px; }
+                node.newlyAdded { fill-color: #22c55e; size: 16px; }
+                node.betweenness { fill-color: #a855f7; size: 18px; stroke-mode: plain; stroke-color: #581c87; }
+                node.kcore { fill-color: #f97316; size: 16px; stroke-mode: plain; stroke-color: #9a3412; }
+                edge { fill-color: #64748b; size: 1px; arrow-size: 8px,4px; }
+                edge.timeline { fill-color: #10b981; size: 1px; }
+                edge.blackEdge { fill-color: #64748b; size: 1px; arrow-size: 8px,4px; }
                 """);
 
         graph.setAttribute("ui.antialias");
         graph.setAttribute("ui.quality");
-        graph.setAttribute("layout.force", 1.2);
-        graph.setAttribute("layout.repulsion", 2.5);
-        graph.setAttribute("layout.gravity", 0.08);
-        graph.setAttribute("layout.quality", 4);
-
-
-        // 1️⃣ NODE’LAR
-        for (Makale m : data) {
-            Node n = getOrCreateNode(m.getId());
-            n.setAttribute("data", m);
-        }
-
-        // 2️⃣ EDGE’LER
-        int edgeId = 0;
-        Set<String> ids = new HashSet<>();
-        data.forEach(m -> ids.add(m.getId()));
-
-        for (Makale m : data) {
-            for (String ref : m.getReferencedWorkIds()) {
-                if (ids.contains(ref)) {
-                    String eid = "e" + edgeId++;
-                    if (graph.getEdge(eid) == null) {
-                        try {
-                            graph.addEdge(eid, m.getId(), ref, true);
-                        } catch (Exception ignored) {
-                        }
-                    }
-                }
-            }
-        }
-
         return graph;
     }
 
-    private Node getOrCreateNode(String id) {
-        Node n = graph.getNode(id);
-        if (n == null) {
-            n = graph.addNode(id);
-        }
-        return n;
+    public Graph getGraph() {
+        return graph;
     }
 
+    public void ensureNode(String id) {
+        if (id == null) return;
+        id = id.trim();
+        if (id.isEmpty()) return;
+
+        synchronized (graph) {
+            if (graph.getNode(id) != null) return;
+            try {
+                Node n = graph.addNode(id);
+                n.setAttribute("citationCount", 0);
+            } catch (Exception e) {
+                logger.debug("ensureNode sırasında hata: id={}", id, e);
+            }
+        }
+    }
+
+    /**
+     * Tek ve kesin ensureDirectedEdge implementasyonu.
+     * - Girdi temizleme (trim)
+     * - Node varlığı kontrolü
+     * - Tekil edge id oluşturma (sanitize edilmiş)
+     * - Hata yakalama ve loglama
+     */
+    public void ensureDirectedEdge(String from, String to) {
+        if (from == null || to == null) return;
+        from = from.trim();
+        to = to.trim();
+        if (from.isEmpty() || to.isEmpty()) return;
+
+        synchronized (graph) {
+            try {
+                if (graph.getNode(from) == null || graph.getNode(to) == null) return;
+
+                String eid = "e_" + sanitizeId(from) + "_" + sanitizeId(to);
+                if (graph.getEdge(eid) != null) return;
+
+                Edge e = graph.addEdge(eid, from, to, true);
+                if (e != null) e.setAttribute("ui.class", "blackEdge");
+            } catch (Exception ex) {
+                logger.debug("ensureDirectedEdge sırasında hata: {} -> {} (exception={})", from, to, ex.toString(), ex);
+            }
+        }
+    }
+
+    public void rebuildTimelineEdges() {
+        synchronized (graph) {
+            try {
+                List<Edge> toRemove = new ArrayList<>();
+                for (Edge e : graph.getEdgeSet()) {
+                    Boolean tl = e.getAttribute("timeline");
+                    if (Boolean.TRUE.equals(tl)) toRemove.add(e);
+                }
+                for (Edge e : toRemove) {
+                    try { graph.removeEdge(e); } catch (Exception ex) {
+                        logger.debug("Timeline edge silinirken hata: {}", e.getId(), ex);
+                    }
+                }
+
+                List<String> ids = new ArrayList<>();
+                for (Node n : graph) ids.add(n.getId());
+                Collections.sort(ids);
+
+                for (int i = 0; i < ids.size() - 1; i++) {
+                    String a = ids.get(i);
+                    String b = ids.get(i + 1);
+                    String gid = "g_" + sanitizeId(a) + "_" + sanitizeId(b);
+                    if (graph.getEdge(gid) != null) continue;
+
+                    try {
+                        Edge ge = graph.addEdge(gid, a, b, false);
+                        if (ge != null) {
+                            ge.setAttribute("ui.class", "timeline");
+                            ge.setAttribute("timeline", true);
+                        }
+                    } catch (Exception ex) {
+                        logger.debug("Timeline edge eklenirken hata: {} <-> {} (gid={})", a, b, gid, ex);
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("rebuildTimelineEdges sırasında beklenmeyen hata", e);
+            }
+        }
+    }
+
+    private String sanitizeId(String id) {
+        if (id == null) return "";
+        return id.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+    }
 }
