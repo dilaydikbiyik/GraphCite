@@ -515,7 +515,32 @@ public class MainApp extends JFrame {
                     var scores = get();
                     double max = scores.values().stream().mapToDouble(Double::doubleValue).max().orElse(0);
                     String mode = finalSubset != null ? "H-Core" : "Tüm Graf";
-                    log("✅ Betweenness (" + mode + ") tamamlandı. " + scores.size() + " düğüm, Max: " + String.format("%.2f", max));
+                    log("✅ Betweenness (" + mode + ") tamamlandı. " + scores.size() + " düğüm");
+                    
+                    // Sonuçları sırala (yüksekten düşüğe)
+                    var sortedScores = scores.entrySet().stream()
+                        .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                        .collect(java.util.stream.Collectors.toList());
+                    
+                    if (finalSubset != null) {
+                        // H-Core: Tüm düğümleri listele
+                        log("   H-Core Betweenness Sonuçları:");
+                        for (var entry : sortedScores) {
+                            String shortId = entry.getKey().replace("https://openalex.org/", "");
+                            log("   - " + shortId + ": " + String.format("%.2f", entry.getValue()));
+                        }
+                    } else {
+                        // Tüm Graf: Top 5 göster
+                        log("   Top 5 Betweenness:");
+                        int count = 0;
+                        for (var entry : sortedScores) {
+                            if (count >= 5) break;
+                            String shortId = entry.getKey().replace("https://openalex.org/", "");
+                            log("   - " + shortId + ": " + String.format("%.2f", entry.getValue()));
+                            count++;
+                        }
+                    }
+                    
                     graphWebView.sendBetweennessResults(scores);
                 } catch (Exception e) {
                     log("❌ Betweenness hatası: " + e.getMessage());
