@@ -54,8 +54,30 @@
         border-radius: 12px;
         padding: 16px;
         color: #f8fafc;
-        min-width: 220px;
+        width: 240px;
         z-index: 100;
+      }
+      .subgraph-stats-panel {
+        position: absolute;
+        bottom: 20px;
+        left: 280px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #f97316;
+        border-radius: 12px;
+        padding: 16px;
+        color: #f8fafc;
+        width: 240px;
+        z-index: 100;
+        display: none;
+      }
+      .subgraph-stats-panel.visible {
+        display: block;
+      }
+      .subgraph-title {
+        color: #f97316;
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 12px;
       }
       .stats-title {
         color: #60a5fa;
@@ -77,7 +99,7 @@
       }
       .legend {
         position: absolute;
-        top: 80px;
+        top: 140px;
         left: 20px;
         background: rgba(15, 23, 42, 0.9);
         border: 1px solid #334155;
@@ -108,6 +130,9 @@
         top: 20px;
         left: 20px;
         z-index: 100;
+        display: flex;
+        gap: 10px;
+        align-items: center;
       }
       .toggle-btn {
         background: rgba(15, 23, 42, 0.9);
@@ -137,7 +162,7 @@
       .search-panel {
         position: absolute;
         top: 20px;
-        left: 220px;
+        left: 420px;
         z-index: 100;
       }
       .search-box {
@@ -225,16 +250,16 @@
           id="highlightToggle"
           onclick="toggleHighlight()"
         >
-          <span class="icon">✨</span>
+          <span class="icon">*</span>
           <span id="toggleText">Hover Vurgulama: Açık</span>
         </button>
         <button
           class="toggle-btn"
           id="clearHCoreBtn"
           onclick="clearHCoreHighlight()"
-          style="margin-top: 8px; display: none"
+          style="display: none"
         >
-          <span class="icon">🔄</span>
+          <span class="icon">X</span>
           <span>H-Core Temizle</span>
         </button>
       </div>
@@ -285,7 +310,7 @@
       </div>
 
       <div class="stats-panel">
-        <div class="stats-title">📊 Graf İstatistikleri</div>
+        <div class="stats-title">Graf Istatistikleri</div>
         <div class="stat-item">
           <span class="stat-label">Toplam Makale:</span
           ><span class="stat-value" id="statNodes">-</span>
@@ -309,6 +334,31 @@
         <div class="stat-item">
           <span class="stat-label">En Çok Atıf Veren:</span
           ><span class="stat-value" id="statTopReferencer">-</span>
+        </div>
+      </div>
+
+      <!-- Genişleyen Alt Graf İstatistikleri -->
+      <div class="subgraph-stats-panel" id="subgraphStatsPanel">
+        <div class="subgraph-title">Genisleyen Graf Istatistikleri</div>
+        <div class="stat-item">
+          <span class="stat-label">Toplam Düğüm:</span
+          ><span class="stat-value" id="subStatNodes">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Toplam Kenar:</span
+          ><span class="stat-value" id="subStatEdges">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Toplam Atıf:</span
+          ><span class="stat-value" id="subStatCitations">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">En Çok Atıf Alan:</span
+          ><span class="stat-value" id="subStatTopCited">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">En Çok Atıf Veren:</span
+          ><span class="stat-value" id="subStatTopReferencer">-</span>
         </div>
       </div>
     </div>
@@ -799,6 +849,14 @@
         const nodeCount = hcoreHighlightNodes.size;
         const linkCount = hcoreHighlightLinks.size;
 
+        // Paneli göster/gizle
+        const panel = document.getElementById("subgraphStatsPanel");
+        if (nodeCount === 0) {
+          panel.classList.remove("visible");
+          return;
+        }
+        panel.classList.add("visible");
+
         // Ön plandaki düğümlerin toplam atıf sayıları
         let totalCitations = 0;
         let totalOutRefs = 0;
@@ -819,6 +877,37 @@
           }
         });
 
+        // Paneli güncelle
+        document.getElementById("subStatNodes").textContent = nodeCount;
+        document.getElementById("subStatEdges").textContent = linkCount;
+        document.getElementById("subStatCitations").textContent =
+          totalCitations;
+
+        if (topCited) {
+          const topCitedId = topCited.id.replace("https://openalex.org/", "");
+          document.getElementById(
+            "subStatTopCited"
+          ).textContent = `${topCitedId.substring(0, 8)}.. (${
+            topCited.citationCount
+          })`;
+        } else {
+          document.getElementById("subStatTopCited").textContent = "-";
+        }
+
+        if (topReferencer) {
+          const topRefId = topReferencer.id.replace(
+            "https://openalex.org/",
+            ""
+          );
+          document.getElementById(
+            "subStatTopReferencer"
+          ).textContent = `${topRefId.substring(0, 8)}.. (${
+            topReferencer.outDegree
+          })`;
+        } else {
+          document.getElementById("subStatTopReferencer").textContent = "-";
+        }
+
         console.log(
           `📊 Genişleyen Graf: ${nodeCount} düğüm, ${linkCount} kenar, ${totalCitations} atıf`
         );
@@ -833,6 +922,11 @@
 
         // H-Core temizle butonunu gizle
         document.getElementById("clearHCoreBtn").style.display = "none";
+
+        // Genişleyen graf panelini gizle
+        document
+          .getElementById("subgraphStatsPanel")
+          .classList.remove("visible");
 
         // Java'ya bildir
         if (window.javaConnector) {
