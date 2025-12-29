@@ -446,10 +446,24 @@
           return COLORS.dimmed;
         }
 
+        // K-Core en yüksek öncelik (turuncu)
         if (node.kcore) return COLORS.kcore;
-        if (newlyAddedNodes.has(node.id)) return COLORS.newlyAdded;
-        if (node.id === selectedNode?.id) return COLORS.selected;
-        if (hcoreNodes.has(node.id)) return COLORS.hcore;
+
+        // Seçili düğüm (tıklanan) - sarı
+        if (selectedNode && node.id === selectedNode.id) return COLORS.selected;
+
+        // Yeni eklenen düğümler (bu tıklamada eklenen) - yeşil
+        if (hcoreActive && newlyAddedNodes.has(node.id))
+          return COLORS.newlyAdded;
+
+        // Önceki H-Core düğümleri (newlyAdded'da olmayanlar) - kırmızı
+        if (
+          hcoreActive &&
+          hcoreHighlightNodes.has(node.id) &&
+          !newlyAddedNodes.has(node.id)
+        )
+          return COLORS.hcore;
+
         return COLORS.node;
       }
 
@@ -768,7 +782,16 @@
         if (!selectedNode || !hcoreIds) return;
 
         hcoreNodes = new Set(hcoreIds);
+
+        // Yeni eklenen düğümleri belirle (önceden highlight'ta olmayanlar)
+        // NOT: Seçili düğümü EKLEME - o her zaman sarı olmalı
         newlyAddedNodes.clear();
+        hcoreIds.forEach((id) => {
+          // Seçili düğüm DEĞİLSE ve önceden highlight'ta DEĞİLSE yeni eklenen
+          if (id !== selectedNode.id && !hcoreHighlightNodes.has(id)) {
+            newlyAddedNodes.add(id);
+          }
+        });
 
         // H-Core görsel vurgulamayı aktifle
         hcoreActive = true;
@@ -781,7 +804,7 @@
 
         const addedCount = hcoreHighlightNodes.size - previousSize;
         console.log(
-          `📈 Genişleme: ${addedCount} yeni düğüm eklendi. Toplam: ${hcoreHighlightNodes.size}`
+          `📈 Genişleme: ${addedCount} yeni düğüm eklendi. Yeşil: ${newlyAddedNodes.size}, Toplam: ${hcoreHighlightNodes.size}`
         );
 
         // Tüm highlight düğümler arasındaki bağlantıları bul
@@ -918,6 +941,7 @@
         hcoreHighlightNodes.clear();
         hcoreHighlightLinks.clear();
         hcoreNodes.clear();
+        newlyAddedNodes.clear();
         selectedNode = null;
 
         // H-Core temizle butonunu gizle
@@ -947,7 +971,20 @@
       }
 
       function showKCoreResults(kcoreIds) {
-        if (!kcoreIds || kcoreIds.length === 0) return;
+        // Önce TÜM düğümlerin K-Core işaretini temizle
+        graphData.nodes.forEach((node) => {
+          node.kcore = false;
+        });
+
+        if (!kcoreIds || kcoreIds.length === 0) {
+          console.log(
+            "⚠️ K-Core sonucu: 0 düğüm bulundu, tüm K-Core işaretleri temizlendi"
+          );
+          // Grafı güncelle (temizlenmiş hali göster)
+          graph.nodeColor(graph.nodeColor());
+          return;
+        }
+
         console.log(`✅ ${kcoreIds.length} K-Core düğümü vurgulanıyor...`);
 
         // K-Core düğümlerini işaretle
