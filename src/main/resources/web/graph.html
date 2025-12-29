@@ -452,17 +452,19 @@
         // Seçili düğüm (tıklanan) - sarı
         if (selectedNode && node.id === selectedNode.id) return COLORS.selected;
 
-        // Yeni eklenen düğümler (bu tıklamada eklenen) - yeşil
-        if (hcoreActive && newlyAddedNodes.has(node.id))
-          return COLORS.newlyAdded;
+        // H-Core aktifse renklendirme yap
+        if (hcoreActive) {
+          // Yeni eklenen düğümler (bu tıklamada eklenen) - yeşil
+          if (newlyAddedNodes.has(node.id)) {
+            return COLORS.newlyAdded;
+          }
 
-        // Önceki H-Core düğümleri (newlyAdded'da olmayanlar) - kırmızı
-        if (
-          hcoreActive &&
-          hcoreHighlightNodes.has(node.id) &&
-          !newlyAddedNodes.has(node.id)
-        )
-          return COLORS.hcore;
+          // Önceki H-Core düğümleri - kırmızı
+          // hcoreHighlightNodes'ta var AMA newlyAddedNodes'ta yok
+          if (hcoreHighlightNodes.has(node.id)) {
+            return COLORS.hcore;
+          }
+        }
 
         return COLORS.node;
       }
@@ -483,8 +485,8 @@
           ) {
             return "rgba(100, 116, 139, 0.08)";
           }
-          // H-Core bağlantısı - kırmızı
-          return "#ef4444";
+          // H-Core bağlantısı - cyan/turkuaz (düğümlerle karışmasın)
+          return "#06b6d4";
         }
 
         // Hover vurgulama
@@ -544,20 +546,30 @@
 
       function drawNode(node, ctx, globalScale) {
         const size = Math.sqrt(node.citationCount + 1) * 2.5 + 3;
-        const isDimmed =
-          hoverNode && highlightNodes.size > 0 && !highlightNodes.has(node.id);
 
-        // Renk belirleme (önbellek kullanımı için basitleştirilmiş)
+        // H-Core aktifse ve bu düğüm ön planda değilse dim yap
+        const isHCoreDimmed =
+          hcoreActive &&
+          hcoreHighlightNodes.size > 0 &&
+          !hcoreHighlightNodes.has(node.id);
+        const isHoverDimmed =
+          highlightEnabled &&
+          hoverNode &&
+          highlightNodes.size > 0 &&
+          !highlightNodes.has(node.id);
+
+        // Renk belirleme - getNodeColor ile aynı mantık
         let color;
-        if (isDimmed) {
+        if (isHCoreDimmed || isHoverDimmed) {
           color = COLORS.dimmed;
         } else if (node.kcore) {
           color = COLORS.kcore;
-        } else if (newlyAddedNodes.has(node.id)) {
-          color = COLORS.newlyAdded;
-        } else if (node.id === selectedNode?.id) {
+        } else if (selectedNode && node.id === selectedNode.id) {
           color = COLORS.selected;
-        } else if (hcoreNodes.has(node.id)) {
+        } else if (hcoreActive && newlyAddedNodes.has(node.id)) {
+          color = COLORS.newlyAdded;
+        } else if (hcoreActive && hcoreHighlightNodes.has(node.id)) {
+          // Önceki H-Core düğümleri - kırmızı
           color = COLORS.hcore;
         } else {
           color = COLORS.node;
@@ -570,14 +582,19 @@
         ctx.fill();
 
         // Highlight border (sadece hover durumunda)
-        if (!isDimmed && highlightNodes.has(node.id) && hoverNode) {
+        if (!isHoverDimmed && highlightNodes.has(node.id) && hoverNode) {
           ctx.strokeStyle = "#fbbf24";
           ctx.lineWidth = 1.5;
           ctx.stroke();
         }
 
         // Atıf sayısı - sadece yeterli zoom ve önemli düğümler için
-        if (!isDimmed && node.citationCount > 2 && globalScale > 0.4) {
+        if (
+          !isHCoreDimmed &&
+          !isHoverDimmed &&
+          node.citationCount > 2 &&
+          globalScale > 0.4
+        ) {
           const fontSize = Math.max(7 / globalScale, 3);
           ctx.font = `bold ${fontSize}px sans-serif`;
           ctx.textAlign = "center";
