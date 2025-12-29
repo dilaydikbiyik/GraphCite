@@ -23,3 +23,5 @@ ehthumbs.db
 *.jar
 *.war
 *.zip
+# --- PDF files (Project requirements docs) ---
+*.pdf

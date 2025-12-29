@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GraphCite - Optimize</title>
+    <!-- Force-Graph: Canvas tabanlı, maksimum performans -->
+    <script src="https://unpkg.com/force-graph@1.43.4/dist/force-graph.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", sans-serif;
+        background: #0f172a;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+      }
+      #graph-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+      #graph {
+        width: 100%;
+        height: 100%;
+      }
+      .tooltip {
+        position: absolute;
+        padding: 12px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        color: #f8fafc;
+        font-size: 12px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s;
+        z-index: 1000;
+        max-width: 350px;
+      }
+      .tooltip.visible {
+        opacity: 1;
+      }
+      .stats-panel {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 16px;
+        color: #f8fafc;
+        min-width: 220px;
+        z-index: 100;
+      }
+      .stats-title {
+        color: #60a5fa;
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+      .stat-item {
+        display: flex;
+        justify-content: space-between;
+        margin: 6px 0;
+      }
+      .stat-label {
+        color: #94a3b8;
+      }
+      .stat-value {
+        color: #10b981;
+        font-weight: bold;
+      }
+      .legend {
+        position: absolute;
+        top: 80px;
+        left: 20px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 11px;
+        color: #94a3b8;
+        z-index: 100;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 4px 0;
+      }
+      .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+      .legend-line {
+        width: 20px;
+        height: 2px;
+        margin-right: 8px;
+      }
+      .toggle-panel {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 100;
+      }
+      .toggle-btn {
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 10px 16px;
+        color: #94a3b8;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+      }
+      .toggle-btn:hover {
+        background: rgba(30, 41, 59, 0.95);
+        border-color: #475569;
+      }
+      .toggle-btn.active {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: #3b82f6;
+        color: #60a5fa;
+      }
+      .toggle-btn .icon {
+        font-size: 14px;
+      }
+      .search-panel {
+        position: absolute;
+        top: 20px;
+        left: 220px;
+        z-index: 100;
+      }
+      .search-box {
+        display: flex;
+        gap: 8px;
+      }
+      .search-input {
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: #f8fafc;
+        font-size: 12px;
+        width: 250px;
+        outline: none;
+      }
+      .search-input:focus {
+        border-color: #3b82f6;
+      }
+      .search-input::placeholder {
+        color: #64748b;
+      }
+      .search-btn {
+        background: #3b82f6;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 16px;
+        color: white;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .search-btn:hover {
+        background: #2563eb;
+      }
+      .search-results {
+        position: absolute;
+        top: 45px;
+        left: 0;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        max-height: 300px;
+        overflow-y: auto;
+        width: 320px;
+        display: none;
+      }
+      .search-results.visible {
+        display: block;
+      }
+      .search-result-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid #1e293b;
+        font-size: 11px;
+      }
+      .search-result-item:hover {
+        background: rgba(59, 130, 246, 0.1);
+      }
+      .search-result-item:last-child {
+        border-bottom: none;
+      }
+      .search-result-title {
+        color: #60a5fa;
+        font-weight: 500;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search-result-info {
+        color: #64748b;
+        font-size: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="graph-container">
+      <div id="graph"></div>
+      <div class="tooltip" id="tooltip"></div>
+
+      <div class="toggle-panel">
+        <button
+          class="toggle-btn active"
+          id="highlightToggle"
+          onclick="toggleHighlight()"
+        >
+          <span class="icon">✨</span>
+          <span id="toggleText">Hover Vurgulama: Açık</span>
+        </button>
+        <button
+          class="toggle-btn"
+          id="clearHCoreBtn"
+          onclick="clearHCoreHighlight()"
+          style="margin-top: 8px; display: none"
+        >
+          <span class="icon">🔄</span>
+          <span>H-Core Temizle</span>
+        </button>
+      </div>
+
+      <div class="search-panel">
+        <div class="search-box">
+          <input
+            type="text"
+            class="search-input"
+            id="searchInput"
+            placeholder="Makale ara (başlık, ID, yazar...)"
+            onkeyup="handleSearchKeyup(event)"
+          />
+          <button class="search-btn" onclick="searchArticles()">Ara</button>
+        </div>
+        <div class="search-results" id="searchResults"></div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: #3b82f6"></div>
+          <span>Normal</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #facc15"></div>
+          <span>Seçili</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ef4444"></div>
+          <span>H-Core</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #22c55e"></div>
+          <span>Yeni Eklenen</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #f97316"></div>
+          <span>K-Core</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line" style="background: #64748b"></div>
+          <span>Referans (Siyah)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line" style="background: #10b981"></div>
+          <span>Timeline (Yeşil)</span>
+        </div>
+      </div>
+
+      <div class="stats-panel">
+        <div class="stats-title">📊 Graf İstatistikleri</div>
+        <div class="stat-item">
+          <span class="stat-label">Toplam Makale:</span
+          ><span class="stat-value" id="statNodes">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Toplam Referans (Siyah):</span
+          ><span class="stat-value" id="statEdges">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Verilen Referans:</span
+          ><span class="stat-value" id="statOutRefs">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Alınan Referans:</span
+          ><span class="stat-value" id="statInRefs">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">En Çok Atıf Alan:</span
+          ><span class="stat-value" id="statTopCited">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">En Çok Atıf Veren:</span
+          ><span class="stat-value" id="statTopReferencer">-</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let graph = null;
+      let graphData = { nodes: [], links: [] };
+      let allData = []; // Tüm makale verisi
+      let selectedNode = null;
+      let hcoreNodes = new Set();
+      let newlyAddedNodes = new Set();
+      let highlightNodes = new Set();
+      let highlightLinks = new Set();
+      let hoverNode = null;
+      let highlightEnabled = true; // Hover vurgulama toggle
+      let hcoreActive = false; // H-Core görsel vurgulama aktif mi
+      let hcoreHighlightNodes = new Set(); // Seçili + H-Core düğümleri
+      let hcoreHighlightLinks = new Set(); // H-Core bağlantıları
+
+      const COLORS = {
+        node: "#3b82f6",
+        selected: "#facc15",
+        hcore: "#ef4444",
+        newlyAdded: "#22c55e",
+        kcore: "#f97316",
+        linkReference: "#64748b",
+        linkTimeline: "#10b981",
+        dimmed: "rgba(100, 116, 139, 0.15)",
+      };
+
+      function initGraph() {
+        graph = ForceGraph()(document.getElementById("graph"))
+          .width(window.innerWidth)
+          .height(window.innerHeight)
+          .backgroundColor("#0f172a")
+          .nodeRelSize(4)
+          .nodeVal((node) => Math.sqrt(node.citationCount + 1) * 2)
+          .nodeColor((node) => getNodeColor(node))
+          .nodeCanvasObject((node, ctx, globalScale) =>
+            drawNode(node, ctx, globalScale)
+          )
+          .nodeCanvasObjectMode(() => "replace")
+          .linkColor((link) => getLinkColor(link))
+          .linkWidth((link) => getLinkWidth(link))
+          .linkDirectionalArrowLength((link) => getLinkArrowLength(link))
+          .linkDirectionalArrowRelPos(1)
+          .linkDirectionalArrowColor((link) => getLinkColor(link))
+          .onNodeHover(handleNodeHover)
+          .onNodeClick(handleNodeClick)
+          .cooldownTicks(150)
+          .warmupTicks(30)
+          .d3AlphaDecay(0.02)
+          .d3VelocityDecay(0.3);
+
+        // Force engine ayarları - geniş yayılım
+        graph.d3Force("charge").strength(-250).distanceMax(800);
+        graph.d3Force("link").distance(80).strength(0.15);
+        graph.d3Force("center").strength(0.01);
+
+        // Pencere yeniden boyutlandırma
+        window.addEventListener("resize", () => {
+          if (graph) {
+            graph.width(window.innerWidth).height(window.innerHeight);
+          }
+        });
+      }
+
+      function getNodeColor(node) {
+        // H-Core aktifse ve bu düğüm h-core grubunda değilse soluklaştır
+        if (
+          hcoreActive &&
+          hcoreHighlightNodes.size > 0 &&
+          !hcoreHighlightNodes.has(node.id)
+        ) {
+          return COLORS.dimmed;
+        }
+
+        // Hover vurgulama (toggle açıksa)
+        if (
+          highlightEnabled &&
+          hoverNode &&
+          highlightNodes.size > 0 &&
+          !highlightNodes.has(node.id)
+        ) {
+          return COLORS.dimmed;
+        }
+
+        if (node.kcore) return COLORS.kcore;
+        if (newlyAddedNodes.has(node.id)) return COLORS.newlyAdded;
+        if (node.id === selectedNode?.id) return COLORS.selected;
+        if (hcoreNodes.has(node.id)) return COLORS.hcore;
+        return COLORS.node;
+      }
+
+      function getLinkColor(link) {
+        const sourceId =
+          typeof link.source === "object" ? link.source.id : link.source;
+        const targetId =
+          typeof link.target === "object" ? link.target.id : link.target;
+        const linkId = `${sourceId}-${targetId}`;
+        const reverseLinkId = `${targetId}-${sourceId}`;
+
+        // H-Core aktifse ilgili bağlantıları vurgula
+        if (hcoreActive && hcoreHighlightLinks.size > 0) {
+          if (
+            !hcoreHighlightLinks.has(linkId) &&
+            !hcoreHighlightLinks.has(reverseLinkId)
+          ) {
+            return "rgba(100, 116, 139, 0.08)";
+          }
+          // H-Core bağlantısı - kırmızı
+          return "#ef4444";
+        }
+
+        // Hover vurgulama
+        if (highlightEnabled && hoverNode && highlightLinks.size > 0) {
+          if (!highlightLinks.has(linkId)) {
+            return "rgba(100, 116, 139, 0.05)";
+          }
+        }
+
+        return link.type === "timeline"
+          ? COLORS.linkTimeline
+          : COLORS.linkReference;
+      }
+
+      function getLinkWidth(link) {
+        const sourceId =
+          typeof link.source === "object" ? link.source.id : link.source;
+        const targetId =
+          typeof link.target === "object" ? link.target.id : link.target;
+        const linkId = `${sourceId}-${targetId}`;
+        const reverseLinkId = `${targetId}-${sourceId}`;
+
+        // H-Core bağlantıları kalın
+        if (
+          hcoreActive &&
+          (hcoreHighlightLinks.has(linkId) ||
+            hcoreHighlightLinks.has(reverseLinkId))
+        ) {
+          return 3;
+        }
+
+        // Hover highlight
+        if (highlightEnabled && hoverNode && highlightLinks.size > 0) {
+          if (highlightLinks.has(linkId)) {
+            return link.type === "timeline" ? 2.5 : 2;
+          }
+        }
+        return link.type === "timeline" ? 1 : 0.5;
+      }
+
+      function getLinkArrowLength(link) {
+        // Sadece referans bağlantılarında ok göster
+        if (link.type !== "reference") return 0;
+
+        // Highlight edilen linklerde daha büyük ok
+        if (hoverNode && highlightLinks.size > 0) {
+          const sourceId =
+            typeof link.source === "object" ? link.source.id : link.source;
+          const targetId =
+            typeof link.target === "object" ? link.target.id : link.target;
+          if (highlightLinks.has(`${sourceId}-${targetId}`)) {
+            return 6;
+          }
+        }
+        return 4;
+      }
+
+      function drawNode(node, ctx, globalScale) {
+        const size = Math.sqrt(node.citationCount + 1) * 2.5 + 3;
+        const isDimmed =
+          hoverNode && highlightNodes.size > 0 && !highlightNodes.has(node.id);
+
+        // Renk belirleme (önbellek kullanımı için basitleştirilmiş)
+        let color;
+        if (isDimmed) {
+          color = COLORS.dimmed;
+        } else if (node.kcore) {
+          color = COLORS.kcore;
+        } else if (newlyAddedNodes.has(node.id)) {
+          color = COLORS.newlyAdded;
+        } else if (node.id === selectedNode?.id) {
+          color = COLORS.selected;
+        } else if (hcoreNodes.has(node.id)) {
+          color = COLORS.hcore;
+        } else {
+          color = COLORS.node;
+        }
+
+        // Basit daire çizimi
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, size, 0, 6.28318); // 2*PI sabit
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // Highlight border (sadece hover durumunda)
+        if (!isDimmed && highlightNodes.has(node.id) && hoverNode) {
+          ctx.strokeStyle = "#fbbf24";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        // Atıf sayısı - sadece yeterli zoom ve önemli düğümler için
+        if (!isDimmed && node.citationCount > 2 && globalScale > 0.4) {
+          const fontSize = Math.max(7 / globalScale, 3);
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          ctx.fillStyle = "#fbbf24";
+          ctx.fillText(node.citationCount, node.x, node.y - size - 1);
+        }
+      }
+
+      function handleNodeHover(node) {
+        hoverNode = node;
+
+        if (node) {
+          showTooltip(node);
+          // Sadece highlight açıksa vurgula
+          if (highlightEnabled) {
+            highlightConnections(node);
+          }
+        } else {
+          hideTooltip();
+          clearHighlights();
+        }
+
+        // Grafı yeniden render et (sadece highlight açıksa)
+        if (graph && highlightEnabled) {
+          graph.nodeColor(graph.nodeColor());
+          graph.linkColor(graph.linkColor());
+          graph.linkWidth(graph.linkWidth());
+          graph.linkDirectionalArrowLength(graph.linkDirectionalArrowLength());
+        }
+      }
+
+      function toggleHighlight() {
+        highlightEnabled = !highlightEnabled;
+        const btn = document.getElementById("highlightToggle");
+        const text = document.getElementById("toggleText");
+
+        if (highlightEnabled) {
+          btn.classList.add("active");
+          text.textContent = "Hover Vurgulama: Açık";
+        } else {
+          btn.classList.remove("active");
+          text.textContent = "Hover Vurgulama: Kapalı";
+          // Mevcut highlight'ları temizle
+          clearHighlights();
+          hoverNode = null;
+          if (graph) {
+            graph.nodeColor(graph.nodeColor());
+            graph.linkColor(graph.linkColor());
+            graph.linkWidth(graph.linkWidth());
+          }
+        }
+      }
+
+      function highlightConnections(node) {
+        highlightNodes.clear();
+        highlightLinks.clear();
+
+        highlightNodes.add(node.id);
+
+        // Daha verimli link tarama
+        const nodeId = node.id;
+        const links = graphData.links;
+        const len = links.length;
+
+        for (let i = 0; i < len; i++) {
+          const link = links[i];
+          const sourceId =
+            typeof link.source === "object" ? link.source.id : link.source;
+          const targetId =
+            typeof link.target === "object" ? link.target.id : link.target;
+
+          if (sourceId === nodeId) {
+            highlightNodes.add(targetId);
+            highlightLinks.add(`${sourceId}-${targetId}`);
+          } else if (targetId === nodeId) {
+            highlightNodes.add(sourceId);
+            highlightLinks.add(`${sourceId}-${targetId}`);
+          }
+        }
+      }
+
+      function clearHighlights() {
+        highlightNodes.clear();
+        highlightLinks.clear();
+      }
+
+      function handleNodeClick(node) {
+        selectedNode = node;
+        if (window.javaConnector) {
+          window.javaConnector.onNodeClicked(node.id);
+        }
+        graph.nodeColor(graph.nodeColor());
+      }
+
+      function showTooltip(node) {
+        const tooltip = document.getElementById("tooltip");
+        if (!node) return;
+        const authors =
+          node.authors?.length > 0
+            ? node.authors.slice(0, 3).join(", ")
+            : "Bilinmiyor";
+        tooltip.innerHTML = `
+          <div style="color:#60a5fa;font-weight:bold;margin-bottom:8px;">${
+            node.title || "Başlık Yok"
+          }</div>
+          <div><span style="color:#94a3b8;">ID:</span> ${node.id}</div>
+          <div><span style="color:#94a3b8;">Yıl:</span> ${
+            node.year || "-"
+          }</div>
+          <div><span style="color:#94a3b8;">Yazarlar:</span> ${authors}</div>
+          <div><span style="color:#94a3b8;">Atıf Sayısı:</span> <span style="color:#10b981;font-weight:bold;">${
+            node.citationCount || 0
+          }</span></div>
+        `;
+        tooltip.classList.add("visible");
+        document.addEventListener("mousemove", updateTooltipPosition);
+      }
+
+      function updateTooltipPosition(e) {
+        const tooltip = document.getElementById("tooltip");
+        tooltip.style.left = e.clientX + 15 + "px";
+        tooltip.style.top = e.clientY - 10 + "px";
+      }
+
+      function hideTooltip() {
+        document.getElementById("tooltip").classList.remove("visible");
+        document.removeEventListener("mousemove", updateTooltipPosition);
+      }
+
+      function loadGraphData(jsonData) {
+        const data =
+          typeof jsonData === "string" ? JSON.parse(jsonData) : jsonData;
+        allData = data;
+        processData(data);
+      }
+
+      function processData(data) {
+        const nodeMap = new Map();
+        data.forEach((m) => nodeMap.set(m.id, m));
+
+        // Atıf sayılarını hesapla
+        const citationCounts = new Map();
+        data.forEach((m) => citationCounts.set(m.id, 0));
+        data.forEach((m) => {
+          if (m.referenced_works) {
+            m.referenced_works.forEach((refId) => {
+              if (citationCounts.has(refId))
+                citationCounts.set(refId, citationCounts.get(refId) + 1);
+            });
+          }
+        });
+
+        graphData.nodes = data.map((m) => ({
+          id: m.id,
+          title: m.title || "",
+          year: m.year || 0,
+          authors: m.authors || [],
+          doi: m.doi || "",
+          citationCount: citationCounts.get(m.id) || 0,
+          outDegree: m.referenced_works ? m.referenced_works.length : 0,
+          referencedWorks: m.referenced_works || [],
+        }));
+
+        graphData.links = [];
+
+        // Referans kenarları (siyah)
+        data.forEach((m) => {
+          if (m.referenced_works) {
+            m.referenced_works.forEach((refId) => {
+              if (nodeMap.has(refId)) {
+                graphData.links.push({
+                  source: m.id,
+                  target: refId,
+                  type: "reference",
+                });
+              }
+            });
+          }
+        });
+
+        // Timeline kenarları (yeşil - ID sırasına göre)
+        const sortedNodes = [...graphData.nodes].sort((a, b) => {
+          const n1 = parseInt(a.id.replace(/\D/g, "")) || 0;
+          const n2 = parseInt(b.id.replace(/\D/g, "")) || 0;
+          return n1 - n2;
+        });
+        for (let i = 0; i < sortedNodes.length - 1; i++) {
+          graphData.links.push({
+            source: sortedNodes[i].id,
+            target: sortedNodes[i + 1].id,
+            type: "timeline",
+          });
+        }
+
+        updateStats();
+        if (!graph) initGraph();
+        graph.graphData(graphData);
+      }
+
+      function showHCoreResults(hIndex, hMedian, hcoreIds) {
+        if (!selectedNode || !hcoreIds) return;
+
+        hcoreNodes = new Set(hcoreIds);
+        newlyAddedNodes.clear();
+
+        // H-Core görsel vurgulamayı aktifle
+        hcoreActive = true;
+
+        // ÖNEMLİ: Önceki highlight'ları TEMİZLEME, üzerine EKLE!
+        // Seçili düğüm + H-Core düğümlerini highlight set'e ekle
+        const previousSize = hcoreHighlightNodes.size;
+        hcoreHighlightNodes.add(selectedNode.id);
+        hcoreIds.forEach((id) => hcoreHighlightNodes.add(id));
+
+        const addedCount = hcoreHighlightNodes.size - previousSize;
+        console.log(
+          `📈 Genişleme: ${addedCount} yeni düğüm eklendi. Toplam: ${hcoreHighlightNodes.size}`
+        );
+
+        // Tüm highlight düğümler arasındaki bağlantıları bul
+        hcoreHighlightLinks.clear(); // Bağlantıları yeniden hesapla
+        graphData.links.forEach((link) => {
+          const sourceId =
+            typeof link.source === "object" ? link.source.id : link.source;
+          const targetId =
+            typeof link.target === "object" ? link.target.id : link.target;
+
+          // Highlight düğümler arasında bağlantı varsa
+          if (
+            hcoreHighlightNodes.has(sourceId) &&
+            hcoreHighlightNodes.has(targetId)
+          ) {
+            hcoreHighlightLinks.add(`${sourceId}-${targetId}`);
+          }
+        });
+
+        // Yeni düğümleri bul ve ekle (eğer grafte yoksa)
+        const existingNodeIds = new Set(graphData.nodes.map((n) => n.id));
+        const nodesToAdd = [];
+
+        hcoreIds.forEach((id) => {
+          if (!existingNodeIds.has(id)) {
+            const makale = allData.find((m) => m.id === id);
+            if (makale) {
+              nodesToAdd.push(makale);
+              newlyAddedNodes.add(id);
+            }
+          }
+        });
+
+        if (nodesToAdd.length > 0) {
+          console.log(
+            `✅ ${nodesToAdd.length} yeni h-core düğümü ekleniyor...`
+          );
+          processData([
+            ...allData.filter(
+              (m) =>
+                existingNodeIds.has(m.id) ||
+                nodesToAdd.find((n) => n.id === m.id)
+            ),
+          ]);
+        }
+
+        // Grafı yeniden render et
+        graph.nodeColor(graph.nodeColor());
+        graph.linkColor(graph.linkColor());
+        graph.linkWidth(graph.linkWidth());
+
+        // H-Core temizle butonunu göster
+        document.getElementById("clearHCoreBtn").style.display = "flex";
+
+        // İstatistik güncelle
+        updateExpandedGraphStats();
+
+        console.log(
+          `✅ Genişleyen graf: ${hcoreHighlightNodes.size} düğüm, ${hcoreHighlightLinks.size} bağlantı`
+        );
+      }
+
+      function updateExpandedGraphStats() {
+        // Genişleyen grafın istatistiklerini hesapla
+        const nodeCount = hcoreHighlightNodes.size;
+        const linkCount = hcoreHighlightLinks.size;
+
+        // Ön plandaki düğümlerin toplam atıf sayıları
+        let totalCitations = 0;
+        let totalOutRefs = 0;
+        let topCited = null;
+        let topReferencer = null;
+
+        graphData.nodes.forEach((node) => {
+          if (hcoreHighlightNodes.has(node.id)) {
+            totalCitations += node.citationCount || 0;
+            totalOutRefs += node.outDegree || 0;
+
+            if (!topCited || node.citationCount > topCited.citationCount) {
+              topCited = node;
+            }
+            if (!topReferencer || node.outDegree > topReferencer.outDegree) {
+              topReferencer = node;
+            }
+          }
+        });
+
+        console.log(
+          `📊 Genişleyen Graf: ${nodeCount} düğüm, ${linkCount} kenar, ${totalCitations} atıf`
+        );
+      }
+
+      function clearHCoreHighlight() {
+        hcoreActive = false;
+        hcoreHighlightNodes.clear();
+        hcoreHighlightLinks.clear();
+        hcoreNodes.clear();
+        selectedNode = null;
+
+        // H-Core temizle butonunu gizle
+        document.getElementById("clearHCoreBtn").style.display = "none";
+
+        // Java'ya bildir
+        if (window.javaConnector) {
+          window.javaConnector.onHCoreClear();
+        }
+
+        if (graph) {
+          graph.nodeColor(graph.nodeColor());
+          graph.linkColor(graph.linkColor());
+          graph.linkWidth(graph.linkWidth());
+        }
+
+        console.log("🔄 H-Core temizlendi, ana grafa dönüldü");
+      }
+
+      function showBetweennessResults(results) {
+        console.log("Betweenness sonuçları:", results);
+      }
+
+      function showKCoreResults(kcoreIds) {
+        if (!kcoreIds || kcoreIds.length === 0) return;
+        console.log(`✅ ${kcoreIds.length} K-Core düğümü vurgulanıyor...`);
+
+        // K-Core düğümlerini işaretle
+        const kcoreSet = new Set(kcoreIds);
+        graphData.nodes.forEach((node) => {
+          node.kcore = kcoreSet.has(node.id);
+        });
+
+        // Grafı güncelle
+        graph.nodeColor(graph.nodeColor());
+      }
+
+      function updateStats() {
+        document.getElementById("statNodes").textContent =
+          graphData.nodes.length;
+        document.getElementById("statEdges").textContent =
+          graphData.links.filter((l) => l.type === "reference").length;
+
+        const totalOutRefs = graphData.nodes.reduce(
+          (sum, n) => sum + n.outDegree,
+          0
+        );
+        const totalInRefs = graphData.nodes.reduce(
+          (sum, n) => sum + n.citationCount,
+          0
+        );
+
+        document.getElementById("statOutRefs").textContent = totalOutRefs;
+        document.getElementById("statInRefs").textContent = totalInRefs;
+
+        if (graphData.nodes.length > 0) {
+          const topCited = graphData.nodes.reduce((max, n) =>
+            n.citationCount > max.citationCount ? n : max
+          );
+          document.getElementById(
+            "statTopCited"
+          ).textContent = `${topCited.id.slice(-8)} (${
+            topCited.citationCount
+          })`;
+
+          const topReferencer = graphData.nodes.reduce((max, n) =>
+            n.outDegree > max.outDegree ? n : max
+          );
+          document.getElementById(
+            "statTopReferencer"
+          ).textContent = `${topReferencer.id.slice(-8)} (${
+            topReferencer.outDegree
+          })`;
+        }
+      }
+
+      // Arama fonksiyonları
+      function handleSearchKeyup(event) {
+        if (event.key === "Enter") {
+          searchArticles();
+        } else if (event.key === "Escape") {
+          hideSearchResults();
+        } else {
+          // Canlı arama - en az 2 karakter
+          const query = document.getElementById("searchInput").value.trim();
+          if (query.length >= 2) {
+            searchArticles();
+          } else {
+            hideSearchResults();
+          }
+        }
+      }
+
+      function searchArticles() {
+        const query = document
+          .getElementById("searchInput")
+          .value.trim()
+          .toLowerCase();
+        if (!query || query.length < 2) {
+          hideSearchResults();
+          return;
+        }
+
+        const results = graphData.nodes
+          .filter((node) => {
+            const title = (node.title || "").toLowerCase();
+            const id = node.id.toLowerCase();
+            const authors = (node.authors || []).join(" ").toLowerCase();
+            const year = String(node.year || "");
+
+            return (
+              title.includes(query) ||
+              id.includes(query) ||
+              authors.includes(query) ||
+              year.includes(query)
+            );
+          })
+          .slice(0, 15); // Max 15 sonuç
+
+        showSearchResults(results);
+      }
+
+      function showSearchResults(results) {
+        const container = document.getElementById("searchResults");
+
+        if (results.length === 0) {
+          container.innerHTML =
+            '<div class="search-result-item"><span style="color:#94a3b8;">Sonuç bulunamadı</span></div>';
+          container.classList.add("visible");
+          return;
+        }
+
+        container.innerHTML = results
+          .map(
+            (node) => `
+          <div class="search-result-item" onclick="goToNode('${node.id}')">
+            <div class="search-result-title">${node.title || "Başlık Yok"}</div>
+            <div class="search-result-info">
+              ${node.id.slice(-10)} • ${node.year || "-"} • Atıf: ${
+              node.citationCount
+            }
+            </div>
+          </div>
+        `
+          )
+          .join("");
+
+        container.classList.add("visible");
+      }
+
+      function hideSearchResults() {
+        document.getElementById("searchResults").classList.remove("visible");
+      }
+
+      function goToNode(nodeId) {
+        const node = graphData.nodes.find((n) => n.id === nodeId);
+        if (!node || !graph) return;
+
+        hideSearchResults();
+        document.getElementById("searchInput").value = "";
+
+        // Düğüme zoom yap ve ortala
+        graph.centerAt(node.x, node.y, 500);
+        graph.zoom(2, 500);
+
+        // Düğümü seç
+        setTimeout(() => {
+          selectedNode = node;
+          if (window.javaConnector) {
+            window.javaConnector.onNodeClicked(node.id);
+          }
+          graph.nodeColor(graph.nodeColor());
+        }, 600);
+      }
+
+      // Dışarı tıklayınca arama sonuçlarını kapat
+      document.addEventListener("click", (e) => {
+        if (!e.target.closest(".search-panel")) {
+          hideSearchResults();
+        }
+      });
+
+      initGraph();
+    </script>
+  </body>
+</html>

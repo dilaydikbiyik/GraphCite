@@ -284,23 +284,42 @@ public class GraphAlgorithms {
     // ---------------- K-CORE ----------------
 
     public List<Makale> runKCoreDecomposition(int k) {
+        return runKCoreDecomposition(k, null);
+    }
+    
+    public List<Makale> runKCoreDecomposition(int k, Set<String> nodeSubset) {
+        // Subset null/empty ise tüm node'lar
+        Set<String> nodes = (nodeSubset == null || nodeSubset.isEmpty())
+                ? new HashSet<>(makaleMap.keySet())
+                : new HashSet<>(nodeSubset);
+        
         Map<String, Integer> currentDegrees = new HashMap<>();
         Map<String, List<String>> adjList = new HashMap<>();
 
-        for (Makale m : makaleler) {
-            adjList.putIfAbsent(m.getId(), new ArrayList<>());
+        // Sadece subset içindeki düğümler için adjacency list oluştur
+        for (String id : nodes) {
+            adjList.put(id, new ArrayList<>());
+        }
+        
+        for (String id : nodes) {
+            Makale m = makaleMap.get(id);
+            if (m == null || m.getReferencedWorkIds() == null) continue;
+            
             for (String refId : m.getReferencedWorkIds()) {
-                if (makaleMap.containsKey(refId)) {
-                    adjList.get(m.getId()).add(refId);
-                    adjList.putIfAbsent(refId, new ArrayList<>());
-                    adjList.get(refId).add(m.getId());
+                if (!nodes.contains(refId)) continue;
+                
+                // UNDIRECTED: çift yönlü kenar ekle
+                if (!adjList.get(id).contains(refId)) {
+                    adjList.get(id).add(refId);
+                }
+                if (!adjList.get(refId).contains(id)) {
+                    adjList.get(refId).add(id);
                 }
             }
         }
 
-        for (String id : makaleMap.keySet()) {
-            currentDegrees.put(id,
-                    adjList.containsKey(id) ? adjList.get(id).size() : 0);
+        for (String id : nodes) {
+            currentDegrees.put(id, adjList.get(id).size());
         }
 
         boolean changed = true;
@@ -308,15 +327,14 @@ public class GraphAlgorithms {
 
         while (changed) {
             changed = false;
-            for (String id : makaleMap.keySet()) {
+            for (String id : nodes) {
                 if (removed.contains(id)) continue;
                 if (currentDegrees.get(id) < k) {
                     removed.add(id);
                     changed = true;
                     for (String nb : adjList.getOrDefault(id, List.of())) {
                         if (!removed.contains(nb)) {
-                            currentDegrees.put(nb,
-                                    currentDegrees.get(nb) - 1);
+                            currentDegrees.put(nb, currentDegrees.get(nb) - 1);
                         }
                     }
                 }
@@ -324,9 +342,10 @@ public class GraphAlgorithms {
         }
 
         List<Makale> result = new ArrayList<>();
-        for (String id : makaleMap.keySet()) {
+        for (String id : nodes) {
             if (!removed.contains(id)) {
-                result.add(makaleMap.get(id));
+                Makale m = makaleMap.get(id);
+                if (m != null) result.add(m);
             }
         }
         return result;

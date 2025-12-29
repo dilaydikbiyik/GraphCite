@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GraphCite - Makale Graf Analiz</title>
+    <!-- Force-Graph.js: Canvas tabanlı, yüksek performans -->
+    <script src="https://unpkg.com/force-graph@1.43.4/dist/force-graph.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #0f172a;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      #graph-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      /* Tooltip */
+      .tooltip {
+        position: absolute;
+        padding: 12px 16px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        color: #f8fafc;
+        font-size: 12px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        max-width: 350px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+      }
+
+      .tooltip.visible {
+        opacity: 1;
+      }
+
+      .tooltip-title {
+        color: #60a5fa;
+        font-weight: bold;
+        font-size: 13px;
+        margin-bottom: 8px;
+        line-height: 1.3;
+      }
+
+      .tooltip-row {
+        display: flex;
+        margin: 4px 0;
+      }
+
+      .tooltip-label {
+        color: #94a3b8;
+        min-width: 80px;
+      }
+
+      .tooltip-value {
+        color: #e2e8f0;
+      }
+
+      .tooltip-value.highlight {
+        color: #10b981;
+        font-weight: bold;
+      }
+
+      /* Loading */
+      .loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #60a5fa;
+        font-size: 18px;
+        z-index: 100;
+      }
+
+      .loading.hidden {
+        display: none;
+      }
+
+      /* Stats Panel (Sol Alt) */
+      .stats-panel {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 16px;
+        color: #f8fafc;
+        font-size: 12px;
+        min-width: 220px;
+        z-index: 100;
+      }
+
+      .stats-title {
+        color: #60a5fa;
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid #334155;
+        padding-bottom: 8px;
+      }
+
+      .stat-item {
+        display: flex;
+        justify-content: space-between;
+        margin: 6px 0;
+      }
+
+      .stat-label {
+        color: #94a3b8;
+      }
+
+      .stat-value {
+        color: #10b981;
+        font-weight: bold;
+      }
+
+      /* Info Panel (Sağ) */
+      .info-panel {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 16px;
+        color: #f8fafc;
+        font-size: 12px;
+        min-width: 250px;
+        max-width: 300px;
+        display: none;
+        z-index: 100;
+      }
+
+      .info-panel.visible {
+        display: block;
+      }
+
+      .info-title {
+        color: #fbbf24;
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+
+      .info-section {
+        margin: 12px 0;
+        padding: 10px;
+        background: rgba(51, 65, 85, 0.5);
+        border-radius: 8px;
+      }
+
+      .info-section-title {
+        color: #60a5fa;
+        font-size: 11px;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+      }
+
+      .info-big-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #10b981;
+      }
+
+      /* Search Box */
+      .search-box {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        z-index: 100;
+      }
+
+      .search-input {
+        padding: 10px 16px;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.9);
+        color: #f8fafc;
+        font-size: 14px;
+        width: 300px;
+        outline: none;
+      }
+
+      .search-input:focus {
+        border-color: #60a5fa;
+      }
+
+      .search-btn {
+        padding: 10px 20px;
+        background: #3b82f6;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .search-btn:hover {
+        background: #2563eb;
+      }
+
+      /* Zoom Controls */
+      .zoom-controls {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 100;
+      }
+
+      .zoom-btn {
+        width: 40px;
+        height: 40px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        color: #f8fafc;
+        font-size: 20px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .zoom-btn:hover {
+        background: #334155;
+      }
+
+      /* Legend */
+      .legend {
+        position: absolute;
+        top: 80px;
+        left: 20px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 11px;
+        color: #94a3b8;
+        z-index: 100;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 4px 0;
+      }
+
+      .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+
+      .legend-line {
+        width: 20px;
+        height: 2px;
+        margin-right: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="graph-container">
+      <div class="loading" id="loading">Graf yükleniyor...</div>
+
+      <!-- Graf buraya renderlanacak -->
+      <div id="graph"></div>
+
+      <!-- Tooltip -->
+      <div class="tooltip" id="tooltip"></div>
+
+      <!-- Search Box -->
+      <div class="search-box">
+        <input
+          type="text"
+          class="search-input"
+          id="searchInput"
+          placeholder="Makale ID veya başlık ara..."
+        />
+        <button class="search-btn" onclick="searchNode()">Ara</button>
+      </div>
+
+      <!-- Legend -->
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: #3b82f6"></div>
+          <span>Normal Düğüm</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #facc15"></div>
+          <span>Seçili Düğüm</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ef4444"></div>
+          <span>H-Core Düğüm</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line" style="background: #64748b"></div>
+          <span>Referans</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line" style="background: #10b981"></div>
+          <span>Timeline</span>
+        </div>
+      </div>
+
+      <!-- Stats Panel -->
+      <div class="stats-panel" id="statsPanel">
+        <div class="stats-title">📊 Graf İstatistikleri</div>
+        <div class="stat-item">
+          <span class="stat-label">Toplam Makale:</span>
+          <span class="stat-value" id="statNodes">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Toplam Referans:</span>
+          <span class="stat-value" id="statEdges">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Verilen Referans:</span>
+          <span class="stat-value" id="statOutRefs">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Alınan Referans:</span>
+          <span class="stat-value" id="statInRefs">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">En Çok Atıf Alan:</span>
+          <span class="stat-value" id="statTopCited">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">En Çok Atıf Veren:</span>
+          <span class="stat-value" id="statTopReferencer">-</span>
+        </div>
+      </div>
+
+      <!-- Info Panel -->
+      <div class="info-panel" id="infoPanel">
+        <div class="info-title" id="infoTitle">Makale Analizi</div>
+        <div id="infoContent"></div>
+      </div>
+
+      <!-- Zoom Controls -->
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoomIn()">+</button>
+        <button class="zoom-btn" onclick="zoomOut()">−</button>
+        <button class="zoom-btn" onclick="resetView()">⟲</button>
+      </div>
+    </div>
+
+    <script>
+      // Global değişkenler
+      let svg = null;
+      let simulation = null;
+      let graphData = { nodes: [], links: [] };
+      let selectedNode = null;
+      let hcoreNodes = new Set();
+      let highlightNodes = new Set();
+      let highlightLinks = new Set();
+
+      // Renk tanımları
+      const COLORS = {
+        node: "#3b82f6",
+        nodeHover: "#60a5fa",
+        selected: "#facc15",
+        hcore: "#ef4444",
+        dimmed: "rgba(100, 116, 139, 0.2)",
+        linkReference: "rgba(100, 116, 139, 0.4)",
+        linkTimeline: "rgba(16, 185, 129, 0.6)",
+        linkHighlight: "rgba(250, 204, 21, 0.8)",
+        text: "#e2e8f0",
+      };
+
+      // Graf başlat
+      function initGraph() {
+        const container = d3.select("#graph");
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // SVG oluştur
+        svg = container
+          .append("svg")
+          .attr("width", width)
+          .attr("height", height)
+          .style("background", "#0f172a");
+
+        // Zoom davranışı
+        const zoom = d3.zoom()
+          .scaleExtent([0.1, 8])
+          .on("zoom", (event) => {
+            g.attr("transform", event.transform);
+          });
+
+        svg.call(zoom);
+
+        // Ana grup
+        const g = svg.append("g");
+
+        // Link grubu (alta)
+        const linkGroup = g.append("g").attr("class", "links");
+
+        // Node grubu (üste)
+        const nodeGroup = g.append("g").attr("class", "nodes");
+
+        // Fizik simülasyonu - OPTIMIZE EDİLMİŞ
+        simulation = d3.forceSimulation()
+          .force("link", d3.forceLink().id(d => d.id).distance(80).strength(0.5))
+          .force("charge", d3.forceManyBody().strength(-400).distanceMax(500))
+          .force("center", d3.forceCenter(width / 2, height / 2))
+          .force("collision", d3.forceCollide().radius(25).strength(0.7))
+          .alphaDecay(0.05) // Daha hızlı durur
+          .velocityDecay(0.6) // Daha fazla sürtünme
+          .alphaMin(0.001); // Daha erken biter
+
+        // Pencere boyutu değişince
+        window.addEventListener("resize", () => {
+          const newWidth = window.innerWidth;
+          const newHeight = window.innerHeight;
+          svg.attr("width", newWidth).attr("height", newHeight);
+          simulation.force("center", d3.forceCenter(newWidth / 2, newHeight / 2));
+          simulation.alpha(0.3).restart();
+        });
+
+        // Arka plan tıklama
+        svg.on("click", function(event) {
+          if (event.target === this || event.target.tagName === "svg") {
+            handleBackgroundClick();
+          }
+        });
+      }
+
+      // Grafı çiz
+      function renderGraph() {
+        const linkGroup = svg.select("g.links");
+        const nodeGroup = svg.select("g.nodes");
+
+        // Linkleri çiz - SADECE REFERENCE LİNKLERİ (performans için timeline'ı kaldırabiliriz)
+        const link = linkGroup
+          .selectAll("line")
+          .data(graphData.links.filter(l => l.type === "reference")) // Sadece referans kenarları
+          .join("line")
+          .attr("stroke", "#64748b")
+          .attr("stroke-width", 0.5)
+          .attr("stroke-opacity", 0.3)
+          .attr("marker-end", "url(#arrowhead)");
+
+        // Ok işareti tanımla
+        svg.select("defs").remove(); // Öncekini temizle
+        svg.append("defs").append("marker")
+          .attr("id", "arrowhead")
+          .attr("viewBox", "-0 -5 10 10")
+          .attr("refX", 20)
+          .attr("refY", 0)
+          .attr("orient", "auto")
+          .attr("markerWidth", 6)
+          .attr("markerHeight", 6)
+          .append("svg:path")
+          .attr("d", "M 0,-5 L 10,0 L 0,5")
+          .attr("fill", "#64748b")
+          .attr("opacity", 0.4);
+
+        // Node'ları çiz
+        const node = nodeGroup
+          .selectAll("g")
+          .data(graphData.nodes)
+          .join("g")
+          .call(drag(simulation));
+
+        // Çemberler
+        node.selectAll("circle").remove();
+        node.append("circle")
+          .attr("r", d => Math.sqrt(d.citationCount + 1) * 2.5 + 3)
+          .attr("fill", d => getNodeColor(d))
+          .attr("stroke", d => {
+            if (d.id === selectedNode?.id) return "#fbbf24";
+            if (hcoreNodes.has(d.id)) return "#991b1b";
+            return "none";
+          })
+          .attr("stroke-width", 2);
+
+        // Atıf sayısı - TÜM MAKALELER
+        node.selectAll("text").remove();
+        node.filter(d => d.citationCount > 0)
+          .append("text")
+          .attr("dy", d => -(Math.sqrt(d.citationCount + 1) * 2.5 + 5))
+          .attr("text-anchor", "middle")
+          .attr("font-size", "9px")
+          .attr("font-weight", "bold")
+          .attr("fill", "#fbbf24")
+          .attr("pointer-events", "none")
+          .text(d => d.citationCount);
+
+        // Hover ve click olayları
+        node
+          .on("mouseenter", function(event, d) {
+            handleNodeHover(d);
+          })
+          .on("mouseleave", function() {
+            handleNodeHover(null);
+          })
+          .on("click", function(event, d) {
+            event.stopPropagation();
+            handleNodeClick(d);
+          })
+          .style("cursor", "pointer");
+
+        // Simülasyon güncelleme - THROTTLED
+        let tickCount = 0;
+        simulation.nodes(graphData.nodes).on("tick", () => {
+          tickCount++;
+          // Her 2 tick'te bir render (performans artışı)
+          if (tickCount % 2 !== 0) return;
+
+          link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+
+          node.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+
+        simulation.force("link").links(graphData.links.filter(l => l.type === "reference"));
+        simulation.alpha(1).restart();
+        
+        // Simülasyonu belirli bir süre sonra durdur (performans)
+        setTimeout(() => {
+          simulation.stop();
+        }, 10000); // 10 saniye sonra dur
+      }
+
+      // Drag davranışı
+      function drag(simulation) {
+        function dragstarted(event) {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          event.subject.fx = event.subject.x;
+          event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+          event.subject.fx = event.x;
+          event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+          if (!event.active) simulation.alphaTarget(0);
+          event.subject.fx = null;
+          event.subject.fy = null;
+        }
+
+        return d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended);
+      }
+
+      // Düğüm rengi
+      function getNodeColor(node) {
+        if (node.id === selectedNode?.id) return COLORS.selected;
+        if (hcoreNodes.has(node.id)) return COLORS.hcore;
+        if (highlightNodes.size > 0 && !highlightNodes.has(node.id))
+          return COLORS.dimmed;
+        return COLORS.node;
+      }
+
+      // Kenar rengi
+      function getLinkColor(link) {
+        const sourceId = typeof link.source === "object" ? link.source.id : link.source;
+        const targetId = typeof link.target === "object" ? link.target.id : link.target;
+
+        if (highlightLinks.has(`${sourceId}-${targetId}`)) {
+          return COLORS.linkHighlight;
+        }
+
+        if (highlightNodes.size > 0) {
+          if (!highlightNodes.has(sourceId) && !highlightNodes.has(targetId)) {
+            return "rgba(100, 116, 139, 0.05)";
+          }
+        }
+
+        return link.type === "timeline"
+          ? COLORS.linkTimeline
+          : COLORS.linkReference;
+      }
+
+      // Hover event
+      function handleNodeHover(node) {
+        if (node) {
+          showTooltip(node);
+          highlightConnections(node);
+          updateGraph();
+        } else {
+          hideTooltip();
+          if (!selectedNode) {
+            clearHighlights();
+            updateGraph();
+          }
+        }
+      }
+
+      // Click event
+      function handleNodeClick(node) {
+        selectedNode = node;
+        highlightConnections(node);
+        updateGraph();
+
+        // Java'ya bildir
+        if (window.javaConnector) {
+          window.javaConnector.onNodeClicked(node.id);
+        }
+
+        // Düğüme odaklan
+        const transform = d3.zoomIdentity
+          .translate(window.innerWidth / 2, window.innerHeight / 2)
+          .scale(2)
+          .translate(-node.x, -node.y);
+        
+        svg.transition()
+          .duration(500)
+          .call(d3.zoom().transform, transform);
+      }
+
+      // Arka plan tıklama
+      function handleBackgroundClick() {
+        selectedNode = null;
+        hcoreNodes.clear();
+        clearHighlights();
+        document.getElementById("infoPanel").classList.remove("visible");
+        updateGraph();
+      }
+
+      // Grafı güncelle (renkleri)
+      function updateGraph() {
+        // PERFORMANS: requestAnimationFrame ile throttle
+        if (updateGraph.rafId) {
+          cancelAnimationFrame(updateGraph.rafId);
+        }
+        
+        updateGraph.rafId = requestAnimationFrame(() => {
+          svg.select("g.nodes").selectAll("circle")
+            .attr("fill", d => getNodeColor(d))
+            .attr("stroke", d => {
+              if (d.id === selectedNode?.id) return "#fbbf24";
+              if (hcoreNodes.has(d.id)) return "#991b1b";
+              return "none";
+            });
+
+          svg.select("g.links").selectAll("line")
+            .attr("stroke", d => getLinkColor(d))
+            .attr("stroke-opacity", d => {
+              const sourceId = typeof d.source === "object" ? d.source.id : d.source;
+              const targetId = typeof d.target === "object" ? d.target.id : d.target;
+              if (highlightLinks.has(`${sourceId}-${targetId}`)) return 0.8;
+              if (highlightNodes.size > 0 && !highlightNodes.has(sourceId) && !highlightNodes.has(targetId)) {
+                return 0.05;
+              }
+              return 0.3;
+            });
+        });
+      }
+
+      // Bağlantıları vurgula
+      function highlightConnections(node) {
+        highlightNodes.clear();
+        highlightLinks.clear();
+
+        highlightNodes.add(node.id);
+
+        graphData.links.forEach((link) => {
+          const sourceId =
+            typeof link.source === "object" ? link.source.id : link.source;
+          const targetId =
+            typeof link.target === "object" ? link.target.id : link.target;
+
+          if (sourceId === node.id) {
+            highlightNodes.add(targetId);
+            highlightLinks.add(`${sourceId}-${targetId}`);
+          }
+          if (targetId === node.id) {
+            highlightNodes.add(sourceId);
+            highlightLinks.add(`${sourceId}-${targetId}`);
+          }
+        });
+      }
+
+      // Vurguları temizle
+      function clearHighlights() {
+        highlightNodes.clear();
+        highlightLinks.clear();
+      }
+
+      // Tooltip göster
+      function showTooltip(node) {
+        const tooltip = document.getElementById("tooltip");
+        const authors =
+          node.authors?.length > 0
+            ? node.authors.slice(0, 3).join(", ")
+            : "Bilinmiyor";
+
+        tooltip.innerHTML = `
+                <div class="tooltip-title">${node.title || "Başlık Yok"}</div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">ID:</span>
+                    <span class="tooltip-value">${node.id}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Yıl:</span>
+                    <span class="tooltip-value">${node.year || "-"}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Yazarlar:</span>
+                    <span class="tooltip-value">${authors}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Atıf Sayısı:</span>
+                    <span class="tooltip-value highlight">${
+                      node.citationCount || 0
+                    }</span>
+                </div>
+            `;
+
+        tooltip.classList.add("visible");
+
+        // Tooltip pozisyonunu fare ile takip et
+        document.addEventListener("mousemove", updateTooltipPosition);
+      }
+
+      function updateTooltipPosition(e) {
+        const tooltip = document.getElementById("tooltip");
+        tooltip.style.left = e.clientX + 15 + "px";
+        tooltip.style.top = e.clientY - 10 + "px";
+      }
+
+      // Tooltip gizle
+      function hideTooltip() {
+        document.getElementById("tooltip").classList.remove("visible");
+        document.removeEventListener("mousemove", updateTooltipPosition);
+      }
+
+      // Java'dan veri al
+      function loadGraphData(jsonData) {
+        try {
+          const data =
+            typeof jsonData === "string" ? JSON.parse(jsonData) : jsonData;
+          processData(data);
+          document.getElementById("loading").classList.add("hidden");
+        } catch (e) {
+          console.error("Veri yükleme hatası:", e);
+        }
+      }
+
+      // Veriyi işle
+      function processData(data) {
+        // Node map oluştur
+        const nodeMap = new Map();
+        data.forEach((m) => nodeMap.set(m.id, m));
+        
+        console.log(`📊 ${data.length} makale yükleniyor...`);
+
+        // Atıf sayılarını hesapla
+        const citationCounts = new Map();
+        data.forEach((m) => citationCounts.set(m.id, 0));
+
+        data.forEach((m) => {
+          if (m.referenced_works) {
+            m.referenced_works.forEach((refId) => {
+              if (citationCounts.has(refId)) {
+                citationCounts.set(refId, citationCounts.get(refId) + 1);
+              }
+            });
+          }
+        });
+
+        // Node'ları oluştur
+        graphData.nodes = data.map((m) => ({
+          id: m.id,
+          title: m.title || "Başlık Yok",
+          year: m.year || 0,
+          authors: m.authors || [],
+          doi: m.doi || "",
+          citationCount: citationCounts.get(m.id) || 0,
+          outDegree: m.referenced_works ? m.referenced_works.length : 0,
+          referencedWorks: m.referenced_works || [],
+        }));
+
+        // Link'leri oluştur - SADECE REFERENCE (timeline kaldırıldı)
+        graphData.links = [];
+
+        // Referans kenarları
+        data.forEach((m) => {
+          if (m.referenced_works) {
+            m.referenced_works.forEach((refId) => {
+              if (nodeMap.has(refId)) {
+                graphData.links.push({
+                  source: m.id,
+                  target: refId,
+                  type: "reference",
+                });
+              }
+            });
+          }
+        });
+
+        console.log(`✅ ${graphData.nodes.length} düğüm, ${graphData.links.length} kenar yüklendi`);
+
+        // İstatistikleri güncelle
+        updateStats();
+
+        // Grafı çiz
+        if (!svg) initGraph();
+        renderGraph();
+      }
+
+      // H-Core sonuçlarını göster (Java'dan çağrılır)
+      function showHCoreResults(hIndex, hMedian, hcoreIds) {
+        const panel = document.getElementById("infoPanel");
+
+        if (!selectedNode) return;
+
+        document.getElementById("infoTitle").textContent = "Makale Analizi";
+        document.getElementById("infoContent").innerHTML = `
+                <div style="color: #94a3b8; font-size: 11px; margin-bottom: 8px;">
+                    ${(selectedNode.title || "").substring(0, 50)}...
+                </div>
+                <div class="info-section">
+                    <div class="info-section-title">H-Index</div>
+                    <div class="info-big-value">${hIndex}</div>
+                </div>
+                <div class="info-section">
+                    <div class="info-section-title">H-Median</div>
+                    <div class="info-big-value">${hMedian}</div>
+                </div>
+                <div class="info-section">
+                    <div class="info-section-title">H-Core Düğüm Sayısı</div>
+                    <div class="info-big-value">${
+                      hcoreIds ? hcoreIds.length : 0
+                    }</div>
+                </div>
+            `;
+
+        panel.classList.add("visible");
+
+        // H-Core düğümlerini işaretle
+        if (hcoreIds) {
+          hcoreNodes = new Set(hcoreIds);
+          updateGraph();
+        }
+      }
+
+      // Betweenness sonuçlarını göster
+      function showBetweennessResults(results) {
+        const panel = document.getElementById("infoPanel");
+        const sorted = results.sort((a, b) => b.score - a.score).slice(0, 10);
+
+        let html =
+          '<div class="info-section"><div class="info-section-title">En Yüksek Skorlar</div>';
+        sorted.forEach((r, i) => {
+          html += `<div style="margin: 4px 0; font-size: 11px;">
+                    <span style="color: #fbbf24;">${i + 1}.</span>
+                    <span style="color: #94a3b8;">${r.id.slice(-10)}</span>
+                    <span style="color: #10b981; float: right;">${r.score.toFixed(
+                      2
+                    )}</span>
+                </div>`;
+        });
+        html += "</div>";
+
+        document.getElementById("infoTitle").textContent =
+          "Betweenness Centrality";
+        document.getElementById("infoContent").innerHTML = html;
+        panel.classList.add("visible");
+      }
+
+      // İstatistikleri güncelle
+      function updateStats() {
+        document.getElementById("statNodes").textContent =
+          graphData.nodes.length;
+        document.getElementById("statEdges").textContent =
+          graphData.links.filter((l) => l.type === "reference").length;
+
+        const totalOutRefs = graphData.nodes.reduce(
+          (sum, n) => sum + n.outDegree,
+          0
+        );
+        const totalInRefs = graphData.nodes.reduce(
+          (sum, n) => sum + n.citationCount,
+          0
+        );
+
+        document.getElementById("statOutRefs").textContent = totalOutRefs;
+        document.getElementById("statInRefs").textContent = totalInRefs;
+
+        // En çok atıf alan
+        if (graphData.nodes.length > 0) {
+          const topCited = graphData.nodes.reduce(
+            (max, n) => (n.citationCount > max.citationCount ? n : max),
+            graphData.nodes[0]
+          );
+          document.getElementById(
+            "statTopCited"
+          ).textContent = `${topCited.id.slice(-8)} (${
+            topCited.citationCount
+          })`;
+
+          // En çok atıf veren
+          const topReferencer = graphData.nodes.reduce(
+            (max, n) => (n.outDegree > max.outDegree ? n : max),
+            graphData.nodes[0]
+          );
+          document.getElementById(
+            "statTopReferencer"
+          ).textContent = `${topReferencer.id.slice(-8)} (${
+            topReferencer.outDegree
+          })`;
+        }
+      }
+
+      // Arama
+      function searchNode() {
+        const query = document
+          .getElementById("searchInput")
+          .value.trim()
+          .toLowerCase();
+        if (!query) return;
+
+        const found = graphData.nodes.find(
+          (n) =>
+            n.id.toLowerCase().includes(query) ||
+            (n.title && n.title.toLowerCase().includes(query))
+        );
+
+        if (found) {
+          selectedNode = found;
+          highlightConnections(found);
+          updateGraph();
+
+          // Düğüme odaklan
+          const transform = d3.zoomIdentity
+            .translate(window.innerWidth / 2, window.innerHeight / 2)
+            .scale(2)
+            .translate(-found.x, -found.y);
+          
+          svg.transition()
+            .duration(500)
+            .call(d3.zoom().transform, transform);
+
+          // Java'ya bildir
+          if (window.javaConnector) {
+            window.javaConnector.onNodeClicked(found.id);
+          }
+        } else {
+          alert("Makale bulunamadı!");
+        }
+      }
+
+      // Enter ile arama
+      document
+        .getElementById("searchInput")
+        .addEventListener("keypress", (e) => {
+          if (e.key === "Enter") searchNode();
+        });
+
+      // Zoom kontrolleri
+      function zoomIn() {
+        svg.transition()
+          .duration(300)
+          .call(d3.zoom().scaleBy, 1.5);
+      }
+
+      function zoomOut() {
+        svg.transition()
+          .duration(300)
+          .call(d3.zoom().scaleBy, 0.7);
+      }
+
+      function resetView() {
+        selectedNode = null;
+        hcoreNodes.clear();
+        clearHighlights();
+        document.getElementById("infoPanel").classList.remove("visible");
+        updateGraph();
+        
+        svg.transition()
+          .duration(500)
+          .call(d3.zoom().transform, d3.zoomIdentity);
+      }
+
+      // Sayfa yüklenince
+      initGraph();
+    </script>
+  </body>
+</html>
