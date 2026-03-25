@@ -4,22 +4,22 @@ GraphCite, akademik makaleler arasındaki atıf (citation) ağlarını, modern a
 
 ## 🚀 Özellikler
 
-*   **Bütünleşik Veri Okuma:** Özel JSON parser ile binlerce satırlık makale bilgisi (`data.json`) anında okunur ve modellere dönüştürülür.
-*   **Dinamik Atıf Ağı (Graf) Görselleştirme:** Ağır masaüstü bileşenleri yerine D3.js alt yapısı kullanılarak pürüzsüz ve etkileşimli bir graf deneyimi (JavaFX WebView) sunulur.
-*   **Gelişmiş Metrik Algoritmaları:**
-    *   **Atıf Sayısı (In-Degree):** Makalenin ne kadar refere edildiği.
-    *   **H-Index Hesaplaması:** Atıfta bulunan makalelerin niteliğine bağlı etki faktörü hesaplaması.
-    *   **H-Core:** Bu index'i oluşturan ana (çekirdek) makalelerin tespiti.
-    *   **H-Median:** H-Core makalelerinin atıf sayılarının ortanca değeri.
-*   **Canlı Etkileşim:** Herhangi bir spesifik makaleye tıklandığında dinamik olarak H-Core alt grafı genişler; yan panelde hızlı ve detaylı istatistik/log akışı izlenir.
+- **Bütünleşik Veri Okuma:** Özel JSON parser ile binlerce satırlık makale bilgisi (`data.json`) anında okunur ve modellere dönüştürülür.
+- **Dinamik Atıf Ağı (Graf) Görselleştirme:** Ağır masaüstü bileşenleri yerine D3.js alt yapısı kullanılarak pürüzsüz ve etkileşimli bir graf deneyimi (JavaFX WebView) sunulur.
+- **Gelişmiş Metrik Algoritmaları:**
+  - **Atıf Sayısı (In-Degree):** Makalenin ne kadar refere edildiği.
+  - **H-Index Hesaplaması:** Atıfta bulunan makalelerin niteliğine bağlı etki faktörü hesaplaması.
+  - **H-Core:** Bu index'i oluşturan ana (çekirdek) makalelerin tespiti.
+  - **H-Median:** H-Core makalelerinin atıf sayılarının ortanca değeri.
+- **Canlı Etkileşim:** Herhangi bir spesifik makaleye tıklandığında dinamik olarak H-Core alt grafı genişler; yan panelde hızlı ve detaylı istatistik/log akışı izlenir.
 
 ## 🛠 Kullanılan Teknolojiler
 
-*   **Dil:** Java 17
-*   **Proje Yönetimi:** Maven
-*   **Grafik Arayüz:** Java Swing & JavaFX WebView Hibrit Mimarisi
-*   **Görselleştirme:** HTML5 Canvas, D3.js (Veri Güdümlü Belgeler)
-*   **Loglama:** SLF4J & Logback
+- **Dil:** Java 17
+- **Proje Yönetimi:** Maven
+- **Grafik Arayüz:** Java Swing & JavaFX WebView Hibrit Mimarisi
+- **Görselleştirme:** HTML5 Canvas, D3.js (Veri Güdümlü Belgeler)
+- **Loglama:** SLF4J & Logback
 
 ## 📂 Proje Yapısı
 
@@ -29,7 +29,7 @@ src/
  │   ├── java/com/kocaeli/graphcite/
  │   │   ├── graph/       # H-Index, H-Core, In-Degree matematiksel algoritmaları
  │   │   ├── model/       # Makale veri modülleri
- │   │   ├── parser/      # Regex tabanlı JSON parser sistemi 
+ │   │   ├── parser/      # Regex tabanlı JSON parser sistemi
  │   │   └── ui/          # Swing Arayüz panelleri ve WebView bileşenleri
  │   └── resources/web/   # D3.js graf görselleştirme dosyaları (HTML/JS)
 ```
@@ -37,8 +37,9 @@ src/
 ## ⚙️ Kurulum ve Çalıştırma
 
 ### Gereksinimler
-*   **JDK 17** veya üstü bir sürüm kurulumu olmalıdır.
-*   **Apache Maven** bilgisayarınızda mevcut olmalıdır.
+
+- **JDK 17** veya üstü bir sürüm kurulumu olmalıdır.
+- **Apache Maven** bilgisayarınızda mevcut olmalıdır.
 
 ### Adımlar
 
@@ -51,15 +52,14 @@ src/
    ```bash
    mvn javafx:run
    ```
-   *(Eğer manuel çalıştırmak isterseniz `MainApp.java` veya `Main.java` sınıflarından başlatabilirsiniz).*
+   _(Eğer manuel çalıştırmak isterseniz `MainApp.java` veya `Main.java` sınıflarından başlatabilirsiniz)._
 
 ## 📖 Kullanım Kılavuzu Yaklaşımı
 
 1. Program açıldığında haritalanmış bir veri graf ağıyla karşılaşacaksınız.
 2. Fare yardımıyla graf görünümünü yakınlaştırıp uzaklaştırabilir (Zoom-in/Out) veya düğümleri sürükleyebilirsiniz.
 3. Herhangi bir **Node (Makale)**'a tıkladığınızda:
-   * Sağ taraftaki *Log ve İstatistik panelinde* makalenin H-Index, H-Median değerlerini göreceksiniz.
-   * Seçili makalenin H-Core kümesinde olan diğer makaleler grafikte görsel olarak vurgulanacak ve ağaç genişleyecektir.  
+   - Sağ taraftaki _Log ve İstatistik panelinde_ makalenin H-Index, H-Median değerlerini göreceksiniz.
+   - Seçili makalenin H-Core kümesinde olan diğer makaleler grafikte görsel olarak vurgulanacak ve ağaç genişleyecektir.
 
 ---
-**Geliştirici:** Kocaeli Üniversitesi - ProLab GraphCite Takımı
