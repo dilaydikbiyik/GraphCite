@@ -1,65 +1,74 @@
-# GraphCite - Makale Graf Analiz Sistemi
+# GraphCite — Citation Graph Analysis System
 
-GraphCite, akademik makaleler arasındaki atıf (citation) ağlarını, modern algoritmalar ve interaktif görselleştirme yöntemleriyle incelemenizi sağlayan, Java tabanlı bir masaüstü uygulamasıdır.
+GraphCite is a Java desktop application for exploring citation networks between academic papers, combining graph algorithms with an interactive, web-based visualization embedded in a native UI.
 
-## 🚀 Özellikler
+## Features
 
-- **Bütünleşik Veri Okuma:** Özel JSON parser ile binlerce satırlık makale bilgisi (`data.json`) anında okunur ve modellere dönüştürülür.
-- **Dinamik Atıf Ağı (Graf) Görselleştirme:** Ağır masaüstü bileşenleri yerine D3.js alt yapısı kullanılarak pürüzsüz ve etkileşimli bir graf deneyimi (JavaFX WebView) sunulur.
-- **Gelişmiş Metrik Algoritmaları:**
-  - **Atıf Sayısı (In-Degree):** Makalenin ne kadar refere edildiği.
-  - **H-Index Hesaplaması:** Atıfta bulunan makalelerin niteliğine bağlı etki faktörü hesaplaması.
-  - **H-Core:** Bu index'i oluşturan ana (çekirdek) makalelerin tespiti.
-  - **H-Median:** H-Core makalelerinin atıf sayılarının ortanca değeri.
-- **Canlı Etkileşim:** Herhangi bir spesifik makaleye tıklandığında dinamik olarak H-Core alt grafı genişler; yan panelde hızlı ve detaylı istatistik/log akışı izlenir.
+- **Custom JSON ingestion** — a purpose-built parser reads thousands of article records from `data.json` and converts them into in-memory graph models.
+- **Interactive citation graph visualization** — instead of a heavyweight desktop graphics toolkit, the graph is rendered with D3.js inside a JavaFX `WebView`, giving a smooth, zoomable, drag-and-drop graph experience embedded in a Swing window.
+- **Citation metrics:**
+  - **In-Degree** — how many times a paper has been cited.
+  - **H-Index** — impact score derived from the citation counts of citing papers.
+  - **H-Core** — the set of papers that constitute a node's H-Index.
+  - **H-Median** — the median citation count within the H-Core set.
+- **Live drill-down** — clicking any article node dynamically expands its H-Core subgraph and streams detailed statistics/logs to a side panel.
 
-## 🛠 Kullanılan Teknolojiler
+## Tech Stack
 
-- **Dil:** Java 17
-- **Proje Yönetimi:** Maven
-- **Grafik Arayüz:** Java Swing & JavaFX WebView Hibrit Mimarisi
-- **Görselleştirme:** HTML5 Canvas, D3.js (Veri Güdümlü Belgeler)
-- **Loglama:** SLF4J & Logback
+| Layer | Technology |
+| --- | --- |
+| Language | Java 17 |
+| Build | Maven |
+| Desktop UI | Java Swing, hybrid with JavaFX `WebView` |
+| Graph rendering | HTML5 Canvas + D3.js |
+| Logging | SLF4J + Logback |
 
-## 📂 Proje Yapısı
+## Project Structure
 
 ```text
-src/
- ├── main/
- │   ├── java/com/kocaeli/graphcite/
- │   │   ├── graph/       # H-Index, H-Core, In-Degree matematiksel algoritmaları
- │   │   ├── model/       # Makale veri modülleri
- │   │   ├── parser/      # Regex tabanlı JSON parser sistemi
- │   │   └── ui/          # Swing Arayüz panelleri ve WebView bileşenleri
- │   └── resources/web/   # D3.js graf görselleştirme dosyaları (HTML/JS)
+GraphCite/
+├── pom.xml
+├── data.json                          # Article/citation dataset
+└── src/
+    └── main/
+        ├── java/com/kocaeli/graphcite/
+        │   ├── graph/                 # H-Index, H-Core, In-Degree algorithms
+        │   ├── model/                 # Article data models
+        │   ├── parser/                # Custom JSON parser
+        │   └── ui/                    # Swing panels + WebView integration (MainApp entrypoint)
+        └── resources/web/             # D3.js graph visualization assets (HTML/JS)
 ```
 
-## ⚙️ Kurulum ve Çalıştırma
+## Getting Started
 
-### Gereksinimler
+### Prerequisites
 
-- **JDK 17** veya üstü bir sürüm kurulumu olmalıdır.
-- **Apache Maven** bilgisayarınızda mevcut olmalıdır.
+- JDK 17 or newer
+- Apache Maven
 
-### Adımlar
+### Build and run
 
-1. Projeyi bir terminal penceresinde veya Favori IDE'nizde (IntelliJ IDEA, VS Code, Eclipse vb.) açın.
-2. Maven ile bağımlılıkları indirin ve projeyi derleyin:
-   ```bash
-   mvn clean install
-   ```
-3. Uygulamayı JavaFX Plugin'i üzerinden başlatın:
-   ```bash
-   mvn javafx:run
-   ```
-   _(Eğer manuel çalıştırmak isterseniz `MainApp.java` veya `Main.java` sınıflarından başlatabilirsiniz)._
+```bash
+git clone https://github.com/dilaydikbiyik/GraphCite.git
+cd GraphCite
+mvn clean install
+mvn javafx:run
+```
 
-## 📖 Kullanım Kılavuzu Yaklaşımı
+Alternatively, run `com.kocaeli.graphcite.ui.MainApp` directly from your IDE.
 
-1. Program açıldığında haritalanmış bir veri graf ağıyla karşılaşacaksınız.
-2. Fare yardımıyla graf görünümünü yakınlaştırıp uzaklaştırabilir (Zoom-in/Out) veya düğümleri sürükleyebilirsiniz.
-3. Herhangi bir **Node (Makale)**'a tıkladığınızda:
-   - Sağ taraftaki _Log ve İstatistik panelinde_ makalenin H-Index, H-Median değerlerini göreceksiniz.
-   - Seçili makalenin H-Core kümesinde olan diğer makaleler grafikte görsel olarak vurgulanacak ve ağaç genişleyecektir.
+## Usage
 
----
+1. On launch, the app loads the citation dataset and renders the full graph.
+2. Use the mouse to zoom, pan, or drag individual nodes.
+3. Click any article node to:
+   - View its H-Index and H-Median in the stats panel on the right.
+   - Highlight the other articles in its H-Core set, expanding the graph around it.
+
+## Contributing
+
+Pull requests are welcome — particularly around parser performance, additional citation metrics, or UI polish. Please open an issue to discuss significant changes first.
+
+## License
+
+No license specified yet.
