@@ -2,6 +2,14 @@
 
 GraphCite is a Java desktop application for exploring citation networks between academic papers, combining graph algorithms with an interactive, web-based visualization embedded in a native UI.
 
+## 📸 Screenshots
+
+### 🖥️ Citation Graph Visualization
+
+![GraphCite App](assets/images/ss_01_app.png)
+
+---
+
 ## Features
 
 - **Custom JSON ingestion** — a purpose-built parser reads thousands of article records from `data.json` and converts them into in-memory graph models.
